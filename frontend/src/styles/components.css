@@ -1,0 +1,143 @@
+/* Navbar */
+.navbar{
+  width: 100%;
+  background: rgba(0,0,0,0.10);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+
+.navbar-inner{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+}
+
+.navbar-logo img{
+  height: 44px;
+  display:block;
+  object-fit: contain;
+}
+
+.navbar-links{
+  display:flex;
+  align-items:center;
+  gap: 16px;
+}
+
+/* Card - fundo sólido (para não deixar ver o gradiente do body) + gradiente azul na parte inferior */
+.card{
+  background: var(--bg-2); /* #0b1220 - sólido */
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Gradiente azul apenas na parte inferior */
+.card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+  background: linear-gradient(180deg, transparent, rgba(47,107,255,0.2));
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Todo o conteúdo do cartão fica acima do gradiente */
+.card > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Inputs */
+.input{
+  width: 100%;
+  height: 42px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.18);
+  color: var(--text);
+  outline: none;
+}
+
+.input:focus{
+  border-color: rgba(47,107,255,0.55);
+  box-shadow: 0 0 0 3px rgba(47,107,255,0.18);
+}
+
+/* Buttons */
+.btn{
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  user-select: none;
+}
+
+.btn-primary{
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 10px 30px rgba(47,107,255,0.25);
+}
+
+.btn-primary:hover{ filter: brightness(1.06); }
+
+.btn-ghost{
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.12);
+  color: var(--text);
+}
+
+.btn-ghost:hover{
+  background: rgba(255,255,255,0.075);
+  border-color: rgba(255,255,255,0.18);
+}
+
+/* Active link (NavLink) */
+.navbar a.active{
+  color: white;
+  font-weight: 900;
+}
+
+/* Dropdown */
+.dropdown{
+  position:absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 260px;
+  padding: 10px;
+  z-index: 50;
+}
+
+.dropdown-item{
+  width: 100%;
+  justify-content: flex-start;
+  height: 38px;
+}
+
+select option {
+  color: #000000 !important;
+}
+
+/* Melhorias para cartões de encomendas */
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+select.input {
+  cursor: pointer;
+}

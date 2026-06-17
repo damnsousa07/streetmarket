@@ -1,0 +1,90 @@
+/* Utilitários */
+.container {
+  width: min(1100px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+/* NAVBAR */
+.navbar {
+  width: 100%;
+  background: rgba(10, 16, 28, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.navbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+.navbar-logo img {
+  height: 38px;
+  display: block;
+  object-fit: contain;
+}
+
+/* LINKS */
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar-links a {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.navbar-links a:hover {
+  opacity: 1;
+}
+
+/* USER */
+.navbar-user {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* DROPDOWN */
+.navbar-categories {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 240px;
+  padding: 10px;
+  z-index: 50;
+}
+
+.dropdown-item {
+  justify-content: flex-start;
+  height: 38px;
+  width: 100%;
+}
+.navbar-links .btn {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.navbar-links a.btn {
+  text-decoration: none;
+}
+
+/* Estilo para dropdowns (select) – letra preta e fundo branco */
+select, select option {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
