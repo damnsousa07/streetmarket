@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
-import Footer from './components/layout/Footer';  // importa o rodapé
+import Footer from './components/layout/Footer';
+import SocialFloat from './components/SocialFloat';
+import FAQFloat from './components/FAQFloat'; // importa o novo componente
 
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
@@ -25,34 +27,41 @@ import Checkout from './pages/Checkout';
 export default function App() {
   return (
     <BrowserRouter>
-      <Navbar />
-      <main style={{ flex: 1 }}>
-        <Routes>
-          {/* User */}
-          <Route path="/" element={<Home />} />
-          <Route path="/products/:id" element={<ProductDetails />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/categories" element={<Categories />} />
-          <Route path="/categories/:category_id" element={<CategoryProducts />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/checkout/:orderId" element={<Checkout />} />
-          <Route path="/paypal-return" element={<PaypalReturn />} />
-          
-          {/* Admin */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/admin/orders" element={<AdminOrders />} />
-          <Route path="/admin/products" element={<AdminProducts />} />
-          <Route path="/admin/categories" element={<AdminCategories />} />
-          <Route path="/admin/notifications" element={<AdminNotifications />} />
-          <Route path="/admin/search-orders" element={<AdminSearchOrders />} />
-        </Routes>
-      </main>
-      <Footer />
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Navbar />
+        <main style={{ flex: 1 }}>
+          <Routes>
+            {/* User */}
+            <Route path="/" element={<Home />} />
+            <Route path="/products/:id" element={<ProductDetails />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/categories/:category_id" element={<CategoryProducts />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/checkout/:orderId" element={<Checkout />} />
+            <Route path="/paypal-return" element={<PaypalReturn />} />
+
+            {/* FAQ – prepara a rota (cria a página depois) */}
+            <Route path="/faq" element={<div style={{ padding: '40px' }}>Página de FAQs em breve...</div>} />
+
+            {/* Admin */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/products" element={<AdminProducts />} />
+            <Route path="/admin/categories" element={<AdminCategories />} />
+            <Route path="/admin/notifications" element={<AdminNotifications />} />
+            <Route path="/admin/search-orders" element={<AdminSearchOrders />} />
+          </Routes>
+        </main>
+        <Footer />
+        {/* Floats */}
+        <FAQFloat />
+        <SocialFloat />
+      </div>
     </BrowserRouter>
   );
 }
-

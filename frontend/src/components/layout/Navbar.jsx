@@ -73,10 +73,7 @@ export default function Navbar() {
                         Categorias
                     </NavLink>
 
-                    <NavLink to="/search?q=&category_id=&min_price=&max_price=&sort=price_asc" className="btn btn-ghost">
-                        Filtrar
-                    </NavLink>
-
+                
                     {/* Links visíveis apenas para utilizadores autenticados */}
                     {loggedIn && (
                         <>
