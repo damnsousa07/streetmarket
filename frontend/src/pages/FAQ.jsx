@@ -43,6 +43,10 @@ const faqData = [
     answer: 'A fatura é enviada automaticamente por email após a conclusão do pagamento. Se precisares de uma cópia adicional, pede-nos por email.',
   },
   {
+    question: 'O produto que eu quero não aparece, como posso pedir para adicionarem-no?',
+    answer: 'Envia-nos um email com foto do produto, nome e marca. Vamos tentar o nosso melhor para o adicionar. Caso não consigamos, responderemos em 24h.',
+  },
+  {
     question: 'A StreetMarket tem loja física?',
     answer: 'Não, a StreetMarket é uma loja online. Trabalhamos apenas através do nosso site.',
   },

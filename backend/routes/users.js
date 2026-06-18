@@ -1,7 +1,7 @@
 /**
  * auth.js
- * Rotas de autenticação (registo, verificação, login) para a StreetMarket.
- * Utiliza bcrypt para hash de passwords, e emailservice para envio de códigos.
+ * Rotas de autenticação (registo, verificação, login, recuperação de password) para a StreetMarket.
+ * Utiliza bcrypt para hash de passwords, e emailservice para envio de códigos e emails de recuperação.
  */
 
 const express = require('express');
@@ -9,7 +9,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const db = require('../db');
-const { sendVerificationEmail } = require('../services/emailservice');
+const { sendVerificationEmail, sendResetPasswordEmail } = require('../services/emailservice');
 
 // Número de rounds para o salt do bcrypt (segurança)
 const saltRounds = 10;
@@ -273,6 +273,118 @@ router.post('/login', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Erro no servidor.' });
+    }
+});
+
+// =======================
+// ESQUECI-ME DA PASSWORD (enviar email com link)
+// =======================
+/**
+ * POST /forgot-password
+ * Gera um token de redefinição e envia um email com o link para o utilizador.
+ * 
+ * Body esperado:
+ *   email
+ * 
+ * Respostas:
+ *   200 – Email enviado (ou mensagem genérica por segurança)
+ *   500 – Erro interno
+ */
+router.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({ message: 'Email é obrigatório.' });
+    }
+
+    try {
+        // Busca o utilizador pelo email
+        const [users] = await db.promise().query(
+            'SELECT user_id, nome FROM Users WHERE email = ?',
+            [email]
+        );
+
+        // Por segurança, não revelamos se o email existe ou não
+        if (users.length === 0) {
+            return res.status(200).json({ message: 'Se o email existir, enviaremos as instruções.' });
+        }
+
+        const user = users[0];
+
+        // Gera um token aleatório (32 bytes em hex)
+        const token = crypto.randomBytes(32).toString('hex');
+        const expires = new Date(Date.now() + 15 * 60000); // 15 minutos
+
+        // Guarda o token e a expiração na base de dados
+        await db.promise().query(
+            'UPDATE Users SET reset_token = ?, reset_expires = ? WHERE user_id = ?',
+            [token, expires, user.user_id]
+        );
+
+        // Constrói o link para o frontend
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const resetLink = `${frontendUrl}/reset-password/${token}`;
+
+        // Envia o email com o link
+        await sendResetPasswordEmail(email, user.nome, resetLink);
+
+        res.status(200).json({ message: 'Se o email existir, enviaremos as instruções.' });
+    } catch (err) {
+        console.error('❌ Erro em forgot-password:', err);
+        res.status(500).json({ message: 'Erro ao processar pedido.' });
+    }
+});
+
+// =======================
+// REDEFINIR PASSWORD (com token)
+// =======================
+/**
+ * POST /reset-password
+ * Define uma nova password utilizando um token válido.
+ * 
+ * Body esperado:
+ *   token, newPassword
+ * 
+ * Respostas:
+ *   200 – Password atualizada com sucesso
+ *   400 – Token inválido ou expirado
+ *   500 – Erro interno
+ */
+router.post('/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+        return res.status(400).json({ message: 'Token e nova password são obrigatórios.' });
+    }
+
+    // Validação básica da nova password (mínimo 6 caracteres)
+    if (newPassword.length < 6) {
+        return res.status(400).json({ message: 'A password deve ter pelo menos 6 caracteres.' });
+    }
+
+    try {
+        // Busca o utilizador com o token válido (não expirado)
+        const [users] = await db.promise().query(
+            'SELECT user_id FROM Users WHERE reset_token = ? AND reset_expires > NOW()',
+            [token]
+        );
+        if (users.length === 0) {
+            return res.status(400).json({ message: 'Token inválido ou expirado.' });
+        }
+
+        const user = users[0];
+
+        // Hash da nova password
+        const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+        // Atualiza a password e limpa o token
+        await db.promise().query(
+            'UPDATE Users SET password = ?, reset_token = NULL, reset_expires = NULL WHERE user_id = ?',
+            [hashedPassword, user.user_id]
+        );
+
+        res.json({ message: 'Password atualizada com sucesso.' });
+    } catch (err) {
+        console.error('❌ Erro em reset-password:', err);
+        res.status(500).json({ message: 'Erro ao redefinir password.' });
     }
 });
 
