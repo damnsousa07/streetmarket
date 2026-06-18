@@ -1,5 +1,5 @@
 // auth.js
-// Serviço de autenticação (login e registo) para o frontend.
+// Serviço de autenticação (login, registo, recuperação de password) para o frontend.
 // Comunica com a API de autenticação do backend.
 
 import { api } from '../api/client';
@@ -47,4 +47,24 @@ export async function registerUser({
     // Faz POST para /users/register
     const res = await api.post('/users/register', payload);
     return res.data; // { message: 'Registo efetuado! Verifica o teu email...' }
+}
+
+// ------------------------------------------------------------
+// PEDIDO DE REDEFINIÇÃO DE PASSWORD (esqueci-me da password)
+// Envia o email para o backend, que gera um token e envia o link.
+// Parâmetro: email (string)
+// Retorna a mensagem de sucesso (genérica por segurança).
+export async function requestPasswordReset(email) {
+    const res = await api.post('/users/forgot-password', { email });
+    return res.data; // { message: 'Se o email existir, enviaremos as instruções.' }
+}
+
+// ------------------------------------------------------------
+// REDEFINIR PASSWORD (com token e nova password)
+// Envia o token e a nova password para o backend.
+// Parâmetros: token (string), newPassword (string)
+// Retorna a mensagem de sucesso.
+export async function resetPassword(token, newPassword) {
+    const res = await api.post('/users/reset-password', { token, newPassword });
+    return res.data; // { message: 'Password atualizada com sucesso.' }
 }

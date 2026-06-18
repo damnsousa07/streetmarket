@@ -77,6 +77,20 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                 />
 
+                {/* Link para recuperação de password */}
+                <Link
+                    to="/forgot-password"
+                    style={{
+                        display: 'block',
+                        marginTop: '8px',
+                        color: '#007bff',
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                    }}
+                >
+                    Esqueci-me da palavra-passe
+                </Link>
+
                 {/* Mensagem de erro (se houver) */}
                 {error && <p style={{ color: 'salmon', marginTop: 10 }}>{error}</p>}
 

@@ -451,9 +451,115 @@ async function sendVerificationEmail(to, nome, codigo) {
     });
 }
 
+// ============================================================
+// Envia email para redefinição de password.
+// Segue o mesmo layout visual dos outros emails.
+// Parâmetros:
+//   to - Email do destinatário
+//   nome - Nome do utilizador
+//   resetLink - Link completo para redefinir a password (ex: http://localhost:5173/reset-password/{token})
+// ============================================================
+async function sendResetPasswordEmail(to, nome, resetLink) {
+    // Array para anexos (imagens inline)
+    const attachments = [];
+
+    // ----- LOGO (inline) -----
+    const logoPath = path.join(__dirname, '../../frontend/public/LogoStreetmarket.png');
+    let logoHtml = '';
+    if (fs.existsSync(logoPath)) {
+        attachments.push({
+            filename: 'logo.png',
+            path: logoPath,
+            cid: 'logo-cid'      // Referência no HTML: src="cid:logo-cid"
+        });
+        logoHtml = `<img src="cid:logo-cid" alt="StreetMarket" style="max-width: 180px; height: auto; display: block;">`;
+    } else {
+        console.warn('⚠️ Logo não encontrada em:', logoPath);
+        // Fallback para URL externa (se definida)
+        logoHtml = `<img src="${process.env.LOGO_URL || 'http://localhost:5173/LogoStreetmarket.png'}" alt="StreetMarket" style="max-width: 180px; height: auto; display: block;">`;
+    }
+
+    // ----- HTML DO EMAIL (mesmo estilo dos outros) -----
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Redefinir password</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f5f5f5; padding: 40px 0;">
+                <tr>
+                    <td align="center">
+                        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <!-- LOGO -->
+                            <tr>
+                                <td align="center" style="padding: 40px 40px 20px 40px;">
+                                    ${logoHtml}
+                                </td>
+                            </tr>
+                            <!-- TÍTULO -->
+                            <tr>
+                                <td align="center" style="padding: 0 40px;">
+                                    <h1 style="font-size: 28px; letter-spacing: 2px; color: #007bff; margin: 0; font-weight: 300;">REDEFINIR PASSWORD</h1>
+                                </td>
+                            </tr>
+                            <!-- MENSAGEM PESSOAL -->
+                            <tr>
+                                <td align="center" style="padding: 30px 40px 20px 40px;">
+                                    <p style="font-size: 18px; color: #333; margin: 0;">Olá <strong>${nome}</strong>,</p>
+                                    <p style="font-size: 16px; color: #666; margin: 15px 0 0 0;">Recebemos um pedido para redefinir a tua password.</p>
+                                    <p style="font-size: 16px; color: #666; margin: 10px 0 20px;">Clica no botão abaixo para definir uma nova password:</p>
+                                </td>
+                            </tr>
+                            <!-- BOTÃO DE REDEFINIÇÃO -->
+                            <tr>
+                                <td align="center" style="padding: 0 40px 30px;">
+                                    <a href="${resetLink}" 
+                                       style="display: inline-block; padding: 14px 40px; background-color: #007bff; 
+                                              color: #fff; text-decoration: none; border-radius: 30px; font-weight: bold; 
+                                              font-size: 16px; margin: 8px 0 4px;">
+                                        Redefinir password
+                                    </a>
+                                </td>
+                            </tr>
+                            <!-- AVISO DE EXPIRAÇÃO -->
+                            <tr>
+                                <td align="center" style="padding: 0 40px 20px;">
+                                    <p style="font-size: 14px; color: #888; margin: 0;">Se não pediste a redefinição, ignora este email.</p>
+                                    <p style="font-size: 12px; color: #aaa; margin-top: 6px;">Este link expira em <strong>15 minutos</strong>.</p>
+                                </td>
+                            </tr>
+                            <!-- RODAPÉ -->
+                            <tr>
+                                <td align="center" style="padding: 30px 40px 40px 40px; border-top: 1px solid #eee;">
+                                    <p style="font-size: 12px; color: #aaa; margin: 0;">&copy; ${new Date().getFullYear()} StreetMarket. Todos os direitos reservados.</p>
+                                    <p style="font-size: 12px; color: #aaa; margin: 5px 0 0;">Precisa de ajuda? <a href="#" style="color: #007bff; text-decoration: none;">Contacte-nos</a></p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+    `;
+
+    // Envio do email
+    await transporter.sendMail({
+        from: `"StreetMarket" <${process.env.EMAIL_USER}>`,
+        to,
+        subject: 'Redefinir password - StreetMarket',
+        html,
+        attachments     // Inclui a logo
+    });
+}
+
 // Exporta as funções para serem usadas noutros módulos
 module.exports = {
     sendOrderEmail,
     sendReviewRequestEmail,
-    sendVerificationEmail
+    sendVerificationEmail,
+    sendResetPasswordEmail   // <-- NOVA
 };

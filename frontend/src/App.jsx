@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import SocialFloat from './components/SocialFloat';
-import FAQFloat from './components/FAQFloat'; // importa o novo componente
+import FAQFloat from './components/FAQFloat';
 
 import Home from './pages/Home';
 import ProductDetails from './pages/ProductDetails';
@@ -13,6 +13,9 @@ import Notifications from './pages/Notifications';
 import Categories from './pages/Categories';
 import CategoryProducts from './pages/CategoryProducts';
 import PaypalReturn from './pages/PaypalReturn';
+import FAQ from './pages/FAQ';
+import ForgotPassword from './pages/ForgotPassword';   // <-- NOVO
+import ResetPassword from './pages/ResetPassword';     // <-- NOVO
 
 import AdminSearchOrders from './pages/admin/AdminSearchOrders';
 import AdminLogin from './pages/admin/AdminLogin';
@@ -43,9 +46,11 @@ export default function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/checkout/:orderId" element={<Checkout />} />
             <Route path="/paypal-return" element={<PaypalReturn />} />
+            <Route path="/faq" element={<FAQ />} />
 
-            {/* FAQ – prepara a rota (cria a página depois) */}
-            <Route path="/faq" element={<div style={{ padding: '40px' }}>Página de FAQs em breve...</div>} />
+            {/* Password recovery */}
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
 
             {/* Admin */}
             <Route path="/admin/login" element={<AdminLogin />} />
