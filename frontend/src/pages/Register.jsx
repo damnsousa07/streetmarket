@@ -3,7 +3,7 @@
 // Aceita estado da navegação (ex: vindo do Login) para preencher email e ir diretamente para a verificação.
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom'; // <-- adicionado useLocation
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
 import { registerUser } from '../services/auth';
 
@@ -15,7 +15,7 @@ export default function Register() {
     const [formData, setFormData] = useState({
         primeiro_nome: '',
         ultimo_nome: '',
-        email: locationState.email || '',   // preenchido se vier do login
+        email: locationState.email || '',
         password: '',
         confirm_password: '',
         morada: '',
@@ -32,13 +32,10 @@ export default function Register() {
     const [error, setError] = useState('');
     const [registeredEmail, setRegisteredEmail] = useState(locationState.email || '');
 
-    // Se recebermos estado a indicar que devemos ir diretamente para verificação,
-    // atualizamos o passo e o email (caso ainda não esteja definido).
     useEffect(() => {
         if (locationState.step === 'verify' && locationState.email) {
             setRegisteredEmail(locationState.email);
             setStep('verify');
-            // Se o email não estiver já no formData, preenchemo-lo
             if (!formData.email) {
                 setFormData(prev => ({ ...prev, email: locationState.email }));
             }
@@ -106,6 +103,11 @@ export default function Register() {
         setError('');
         setMessage('');
 
+        // ----- VALIDAÇÕES LOCAIS -----
+        if (formData.password.length < 8) {
+            setError('A palavra-passe deve ter pelo menos 8 caracteres.');
+            return;
+        }
         if (formData.password !== formData.confirm_password) {
             setError('As palavras-passe não coincidem.');
             return;
@@ -188,8 +190,26 @@ export default function Register() {
                                 <input type="text" name="ultimo_nome" placeholder="Último nome *" value={formData.ultimo_nome} onChange={handleChange} className="input" required />
                             </div>
                             <input type="email" name="email" placeholder="Email *" value={formData.email} onChange={handleChange} className="input" required />
-                            <input type="password" name="password" placeholder="Palavra-passe *" value={formData.password} onChange={handleChange} className="input" required />
-                            <input type="password" name="confirm_password" placeholder="Confirmar palavra-passe *" value={formData.confirm_password} onChange={handleChange} className="input" required />
+                            <input
+                                type="password"
+                                name="password"
+                                placeholder="Palavra-passe *"
+                                value={formData.password}
+                                onChange={handleChange}
+                                className="input"
+                                required
+                                minLength={8}
+                            />
+                            <input
+                                type="password"
+                                name="confirm_password"
+                                placeholder="Confirmar palavra-passe *"
+                                value={formData.confirm_password}
+                                onChange={handleChange}
+                                className="input"
+                                required
+                                minLength={8}
+                            />
                             <input type="text" name="morada" placeholder="Morada *" value={formData.morada} onChange={handleChange} className="input" required />
                             <input
                                 type="text"

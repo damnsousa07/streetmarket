@@ -19,8 +19,9 @@ export default function ResetPassword() {
         setError('');
         setMessage('');
 
-        if (password.length < 6) {
-            setError('A password deve ter pelo menos 6 caracteres.');
+        // ----- VALIDAÇÃO: mínimo 8 caracteres -----
+        if (password.length < 8) {
+            setError('A password deve ter pelo menos 8 caracteres.');
             return;
         }
         if (password !== confirm) {
@@ -55,7 +56,7 @@ export default function ResetPassword() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        minLength={6}
+                        minLength={8}
                     />
                     <input
                         type="password"
@@ -65,6 +66,7 @@ export default function ResetPassword() {
                         value={confirm}
                         onChange={(e) => setConfirm(e.target.value)}
                         required
+                        minLength={8}
                     />
                     {error && <p style={{ color: 'salmon', marginTop: '10px' }}>{error}</p>}
                     {message && <p style={{ color: 'lightgreen', marginTop: '10px' }}>{message}</p>}

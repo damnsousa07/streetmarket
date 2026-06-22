@@ -34,7 +34,8 @@ export default function Login() {
             localStorage.setItem('user_nome', data.nome || '');
             localStorage.setItem('user_email', data.email || '');
             localStorage.setItem('auth_expires_at', String(Date.now() + SESSION_MS));
-
+            localStorage.setItem('user_tipo', data.tipo || '');
+            
             navigate('/');
             window.location.reload();
         } catch (e) {
