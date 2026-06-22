@@ -1,5 +1,5 @@
 // AdminOrders.jsx
-// Página de administração de encomendas com atualização de estado e modal de sucesso.
+// Página de administração de encomendas com atualização de estado, modal de confirmação, sucesso e aviso.
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getAdminOrders, updateAdminOrderStatus } from '../../api/admin';
@@ -42,6 +42,10 @@ export default function AdminOrders({ embedded = false }) {
     // Modal de sucesso
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+
+    // Modal de aviso (centralizado)
+    const [showWarningModal, setShowWarningModal] = useState(false);
+    const [warningMessage, setWarningMessage] = useState('');
 
     const fetchOrders = useCallback(async (search, status) => {
         if (!requireAdminKey()) {
@@ -102,8 +106,10 @@ export default function AdminOrders({ embedded = false }) {
         const currentStatus = STATUS_OPTIONS.find(s => s.id === currentOrder.status_id)?.label || 'Desconhecido';
         const newStatus = STATUS_OPTIONS.find(s => s.id === newStatusId)?.label || 'Desconhecido';
 
+        // Se o estado for o mesmo, mostra modal de aviso em vez de alert/toast
         if (currentOrder.status_id === newStatusId) {
-            alert('A encomenda já está neste estado.');
+            setWarningMessage(`A encomenda #${orderId} já está no estado "${currentStatus}".`);
+            setShowWarningModal(true);
             return;
         }
 
@@ -116,7 +122,6 @@ export default function AdminOrders({ embedded = false }) {
         setShowConfirmModal(true);
     };
 
-    // Confirmar alteração
     const handleConfirm = async () => {
         const { orderId, newStatusId } = confirmData;
         if (!orderId || newStatusId == null) return;
@@ -377,6 +382,60 @@ export default function AdminOrders({ embedded = false }) {
                                 cursor: 'pointer',
                                 fontWeight: 600,
                                 marginTop: '12px',
+                            }}
+                        >
+                            OK
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de aviso (centralizado) */}
+            {showWarningModal && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 9999,
+                        padding: '20px',
+                    }}
+                    onClick={() => setShowWarningModal(false)}
+                >
+                    <div
+                        style={{
+                            backgroundColor: '#fff',
+                            borderRadius: '16px',
+                            padding: '32px 24px',
+                            maxWidth: '440px',
+                            width: '100%',
+                            textAlign: 'center',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ fontSize: '36px', marginBottom: '8px' }}>⚠️</div>
+                        <h3 style={{ margin: '0 0 8px', color: '#1a1a1a' }}>Aviso</h3>
+                        <p style={{ color: '#555', fontSize: '15px', lineHeight: '1.5', marginBottom: '20px' }}>
+                            {warningMessage}
+                        </p>
+                        <button
+                            onClick={() => setShowWarningModal(false)}
+                            style={{
+                                background: '#ff9800',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '40px',
+                                padding: '10px 32px',
+                                fontSize: '15px',
+                                cursor: 'pointer',
+                                fontWeight: 600,
                             }}
                         >
                             OK

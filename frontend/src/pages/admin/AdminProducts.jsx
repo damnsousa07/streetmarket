@@ -33,17 +33,14 @@ const SORT_OPTIONS = [
 
 // ------------------------------------------------------------
 // Componente de barra de pesquisa (memoizado para evitar re-renders desnecessários)
-// Inclui: campo de pesquisa (com debounce), filtros por categoria/marca/preço e ordenação
 const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands }) => {
   const [localSearch, setLocalSearch] = useState(filters.search || '');
   const debounceTimer = useRef(null);
 
-  // Sincroniza o estado local com o valor dos filtros (quando vindo de fora)
   useEffect(() => {
     setLocalSearch(filters.search || '');
   }, [filters.search]);
 
-  // Handler com debounce de 500ms para a pesquisa
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setLocalSearch(value);
@@ -55,7 +52,6 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
 
   return (
     <div style={{ display: 'flex', gap: '12px', margin: '20px 0', flexWrap: 'wrap', alignItems: 'center' }}>
-      {/* Campo de pesquisa textual */}
       <input
         type="text"
         value={localSearch}
@@ -64,7 +60,6 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
         className="input"
         style={{ flex: 2, minWidth: '200px' }}
       />
-      {/* Filtro por categoria */}
       <select
         name="category_id"
         value={filters.category_id}
@@ -77,7 +72,6 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
           <option key={cat.category_id} value={cat.category_id}>{cat.nome}</option>
         ))}
       </select>
-      {/* Filtro por marca */}
       <select
         name="brand"
         value={filters.brand}
@@ -90,7 +84,6 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
           <option key={brand} value={brand}>{brand}</option>
         ))}
       </select>
-      {/* Preço mínimo */}
       <input
         type="number"
         name="min_price"
@@ -100,7 +93,6 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
         className="input"
         style={{ width: '120px' }}
       />
-      {/* Preço máximo */}
       <input
         type="number"
         name="max_price"
@@ -110,7 +102,6 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
         className="input"
         style={{ width: '120px' }}
       />
-      {/* Ordenação */}
       <select
         name="sort"
         value={filters.sort}
@@ -129,7 +120,6 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
 // ------------------------------------------------------------
 // Componente principal de gestão de produtos (admin)
 export default function AdminProducts({ embedded = false }) {
-  // Estados para a lista de produtos, categorias, marcas, carregamento e erro
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -137,7 +127,6 @@ export default function AdminProducts({ embedded = false }) {
   const [loadingCats, setLoadingCats] = useState(true);
   const [error, setError] = useState('');
 
-  // Filtros atuais (pesquisa, categoria, marca, preço mínimo/máximo, ordenação)
   const [filters, setFilters] = useState({
     search: '',
     category_id: '',
@@ -147,12 +136,10 @@ export default function AdminProducts({ embedded = false }) {
     sort: 'id_desc',
   });
 
-  // Estados para edição de produto
   const [editingProduct, setEditingProduct] = useState(null);
-  const [existingImages, setExistingImages] = useState([]); // Imagens já existentes (em edição)
-  const [modalImage, setModalImage] = useState(null);      // Imagem ampliada no modal
+  const [existingImages, setExistingImages] = useState([]);
+  const [modalImage, setModalImage] = useState(null);
 
-  // Referências para os campos do formulário (criação/edição)
   const nomeRef = useRef('');
   const marcaRef = useRef('');
   const precoRef = useRef('');
@@ -160,24 +147,27 @@ export default function AdminProducts({ embedded = false }) {
   const categoryIdRef = useRef('');
   const tamanhosRef = useRef('');
 
-  // Estados para novas imagens (upload)
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Estados para modais personalizados
-  const [showConfirmModal, setShowConfirmModal] = useState(false);   // Confirmação de edição
-  const [showSuccessModal, setShowSuccessModal] = useState(false);   // Sucesso (criação/edição)
-  const [showDeleteModal, setShowDeleteModal] = useState(false);     // Confirmação de eliminação
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteErrorModal, setShowDeleteErrorModal] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [deleteTargetName, setDeleteTargetName] = useState('');
-  const [successData, setSuccessData] = useState({ nome: '', marca: '', preco: 0, isEdit: false });
+  const [successData, setSuccessData] = useState({
+    nome: '',
+    marca: '',
+    preco: 0,
+    isEdit: false,
+    isDelete: false, // <-- novo campo para identificar eliminação
+  });
 
-  // Verifica se o utilizador tem chave de administrador
   const hasKey = useMemo(() => requireAdminKey(), []);
 
   // ------------------------------------------------------------
-  // Função que busca produtos com os filtros atuais
   const fetchProducts = useCallback(async () => {
     if (!requireAdminKey()) {
       setError('Sem admin key.');
@@ -204,13 +194,11 @@ export default function AdminProducts({ embedded = false }) {
     }
   }, [filters]);
 
-  // Efeito que recarrega sempre que os filtros mudarem
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
   // ------------------------------------------------------------
-  // Carrega categorias e marcas (para os dropdowns)
   async function loadCategories() {
     if (!requireAdminKey()) {
       setLoadingCats(false);
@@ -241,13 +229,11 @@ export default function AdminProducts({ embedded = false }) {
     }
   }
 
-  // Carrega categorias e marcas ao montar
   useEffect(() => {
     loadCategories();
     loadBrands();
   }, []);
 
-  // Handlers para os filtros
   const handleSearch = useCallback((searchValue) => {
     setFilters(prev => ({ ...prev, search: searchValue }));
   }, []);
@@ -257,25 +243,11 @@ export default function AdminProducts({ embedded = false }) {
     setFilters(prev => ({ ...prev, [name]: value }));
   }, []);
 
-  // Limpa todos os filtros
-  const clearFilters = () => {
-    setFilters({
-      search: '',
-      category_id: '',
-      brand: '',
-      min_price: '',
-      max_price: '',
-      sort: 'id_desc',
-    });
-  };
-
-  // Força a atualização manual
   const handleRefresh = () => {
     fetchProducts();
   };
 
   // ------------------------------------------------------------
-  // Inicia a edição de um produto (carrega os detalhes completos)
   async function startEdit(product) {
     try {
       const productId = product.product_id ?? product.Product_id;
@@ -284,10 +256,8 @@ export default function AdminProducts({ embedded = false }) {
         setError('ID do produto não encontrado.');
         return;
       }
-      // Busca os detalhes completos do produto
       const fullProduct = await getAdminProductById(productId);
       setEditingProduct(fullProduct);
-      // Preenche os campos do formulário com os dados
       if (nomeRef.current) nomeRef.current.value = fullProduct.nome || '';
       if (marcaRef.current) marcaRef.current.value = fullProduct.marca || '';
       if (precoRef.current) precoRef.current.value = fullProduct.preco || '';
@@ -297,7 +267,6 @@ export default function AdminProducts({ embedded = false }) {
       setExistingImages(fullProduct.images || []);
       setImageFiles([]);
       setPreviewUrls([]);
-      // Rola para o formulário de edição
       document.querySelector('.admin-product-form')?.scrollIntoView({ behavior: 'smooth' });
     } catch (err) {
       console.error('Erro ao carregar produto para edição:', err);
@@ -305,7 +274,6 @@ export default function AdminProducts({ embedded = false }) {
     }
   }
 
-  // Cancela o modo de edição
   function cancelEdit() {
     setEditingProduct(null);
     if (nomeRef.current) nomeRef.current.value = '';
@@ -319,7 +287,6 @@ export default function AdminProducts({ embedded = false }) {
     setExistingImages([]);
   }
 
-  // Handler para seleção de imagens (upload)
   function handleImageChange(e) {
     const files = Array.from(e.target.files);
     setImageFiles(files);
@@ -327,27 +294,18 @@ export default function AdminProducts({ embedded = false }) {
     setPreviewUrls(urls);
   }
 
-  // Remove uma imagem existente (em modo de edição)
   function removeExistingImage(imageId) {
     setExistingImages(prev => prev.filter(img => img.image_id !== imageId));
   }
 
   // ------------------------------------------------------------
-  // Modais: confirmação de edição
-  const openConfirmEdit = () => {
-    setShowConfirmModal(true);
-  };
-
+  const openConfirmEdit = () => setShowConfirmModal(true);
   const confirmEdit = async () => {
     setShowConfirmModal(false);
     await performSubmit(true);
   };
+  const cancelConfirm = () => setShowConfirmModal(false);
 
-  const cancelConfirm = () => {
-    setShowConfirmModal(false);
-  };
-
-  // Modais: confirmação de eliminação
   const openDeleteConfirm = (id, nome) => {
     setDeleteTargetId(id);
     setDeleteTargetName(nome || '');
@@ -357,15 +315,37 @@ export default function AdminProducts({ embedded = false }) {
   const confirmDelete = async () => {
     setShowDeleteModal(false);
     const id = deleteTargetId;
+    const nome = deleteTargetName;
     try {
       setError('');
       await deleteAdminProduct(id);
       await fetchProducts();
-      alert('Produto apagado com sucesso.');
+      // Mostra modal de sucesso em vez de alert
+      setSuccessData({
+        nome: nome,
+        marca: '',
+        preco: 0,
+        isEdit: false,
+        isDelete: true,
+      });
+      setShowSuccessModal(true);
     } catch (e) {
-      const status = e?.response?.status;
-      const m = e?.response?.data?.message;
-      setError(`Falha ao apagar produto. ${status ? `(HTTP ${status})` : ''} ${m ? `- ${m}` : ''}`);
+      // Log detalhado para depuração
+      console.log('ERRO COMPLETO:', e);
+      console.log('RESPONSE:', e?.response);
+      console.log('DATA:', e?.response?.data);
+
+      const data = e?.response?.data || {};
+      const errno = data.errno ?? e.errno ?? null;
+      const sqlMessage = data.sqlMessage ?? data.message ?? e.sqlMessage ?? '';
+
+      if (errno === 1451 || sqlMessage.toLowerCase().includes('foreign key constraint') || sqlMessage.includes('Cannot delete')) {
+        setShowDeleteErrorModal(true);
+      } else {
+        const status = e?.response?.status;
+        const m = data.message || e.message;
+        setError(`Falha ao apagar produto. ${status ? `(HTTP ${status})` : ''} ${m ? `- ${m}` : ''}`);
+      }
     } finally {
       setDeleteTargetId(null);
       setDeleteTargetName('');
@@ -378,10 +358,10 @@ export default function AdminProducts({ embedded = false }) {
     setDeleteTargetName('');
   };
 
+  const closeDeleteErrorModal = () => setShowDeleteErrorModal(false);
+
   // ------------------------------------------------------------
-  // Submissão do formulário (criação ou edição)
   const performSubmit = async (isConfirmed = false) => {
-    // Recolhe os valores dos campos
     const nome = nomeRef.current.value;
     const marca = marcaRef.current.value;
     const preco = precoRef.current.value;
@@ -389,7 +369,6 @@ export default function AdminProducts({ embedded = false }) {
     const category_id = categoryIdRef.current.value;
     const tamanhos = tamanhosRef.current.value;
 
-    // Validações básicas
     if (!nome || !marca || !preco || !category_id) {
       setError('Nome, marca, preço e categoria são obrigatórios.');
       return;
@@ -400,7 +379,6 @@ export default function AdminProducts({ embedded = false }) {
       return;
     }
 
-    // Monta o FormData para enviar (inclui imagens)
     const formData = new FormData();
     formData.append('nome', nome.trim());
     formData.append('marca', marca.trim());
@@ -415,41 +393,36 @@ export default function AdminProducts({ embedded = false }) {
       setError('');
 
       if (editingProduct) {
-        // MODO EDIÇÃO: atualiza o produto existente
         const productId = editingProduct.product_id ?? editingProduct.Product_id;
-        // Calcula quais imagens foram removidas (para enviar ao backend)
         const originalIds = (editingProduct.images || []).map(img => img.image_id);
         const currentIds = existingImages.map(img => img.image_id);
         const imagesToDelete = originalIds.filter(id => !currentIds.includes(id));
         if (imagesToDelete.length > 0) {
           formData.append('imagesToDelete', JSON.stringify(imagesToDelete));
         }
-        // Guarda a nova ordem das imagens
         const newOrder = existingImages.map(img => img.image_id);
         formData.append('imagesOrder', JSON.stringify(newOrder));
 
-        // Chama a API de atualização
         await updateAdminProduct(productId, formData);
-        // Prepara dados para o modal de sucesso
         setSuccessData({
           nome: nome.trim(),
           marca: marca.trim(),
           preco: precoNum,
           isEdit: true,
+          isDelete: false,
         });
         setShowSuccessModal(true);
-        cancelEdit(); // Sai do modo de edição
+        cancelEdit();
       } else {
-        // MODO CRIAÇÃO: cria um novo produto
         await createAdminProduct(formData);
         setSuccessData({
           nome: nome.trim(),
           marca: marca.trim(),
           preco: precoNum,
           isEdit: false,
+          isDelete: false,
         });
         setShowSuccessModal(true);
-        // Limpa o formulário
         nomeRef.current.value = '';
         marcaRef.current.value = '';
         precoRef.current.value = '';
@@ -459,7 +432,6 @@ export default function AdminProducts({ embedded = false }) {
         setImageFiles([]);
         setPreviewUrls([]);
       }
-      // Recarrega a lista de produtos para refletir as alterações
       await fetchProducts();
     } catch (err) {
       const status = err?.response?.status;
@@ -470,7 +442,6 @@ export default function AdminProducts({ embedded = false }) {
     }
   };
 
-  // Handler do submit do formulário: se for edição, abre modal de confirmação
   const handleSubmit = (e) => {
     e.preventDefault();
     if (editingProduct) {
@@ -480,17 +451,11 @@ export default function AdminProducts({ embedded = false }) {
     }
   };
 
-  // Fecha o modal de sucesso
-  const closeSuccessModal = () => {
-    setShowSuccessModal(false);
-  };
+  const closeSuccessModal = () => setShowSuccessModal(false);
 
-  // ------------------------------------------------------------
-  // Wrapper para permitir uso embebido (sem container) noutras páginas
   const Wrapper = ({ children }) =>
     embedded ? <div>{children}</div> : <div className="container" style={{ padding: '32px 0' }}>{children}</div>;
 
-  // Se não houver chave de admin, mostra aviso
   if (!hasKey) {
     return (
       <Wrapper>
@@ -501,10 +466,8 @@ export default function AdminProducts({ embedded = false }) {
   }
 
   // ------------------------------------------------------------
-  // Renderização principal
   return (
     <Wrapper>
-      {/* Cabeçalho (apenas se não estiver embebido) */}
       {!embedded && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
           <div>
@@ -517,10 +480,8 @@ export default function AdminProducts({ embedded = false }) {
         </div>
       )}
 
-      {/* Mensagem de erro geral */}
       {error && <p style={{ color: 'salmon', marginTop: 16 }}>{error}</p>}
 
-      {/* Barra de pesquisa e filtros */}
       <SearchBar
         onSearch={handleSearch}
         onFilterChange={handleFilterChange}
@@ -529,28 +490,23 @@ export default function AdminProducts({ embedded = false }) {
         brands={brands}
       />
 
-      {/* Formulário de criação/edição de produto */}
       <div className="card admin-product-form" style={{ padding: 14, marginTop: 16 }}>
         <div style={{ fontWeight: 900, marginBottom: 10 }}>
           {editingProduct ? '✏️ Editar produto' : '➕ Criar produto'}
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* Nome */}
           <div>
             <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Nome *</label>
             <input className="input" name="nome" ref={nomeRef} defaultValue={editingProduct?.nome || ''} />
           </div>
-          {/* Marca */}
           <div>
             <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Marca *</label>
             <input className="input" name="marca" ref={marcaRef} defaultValue={editingProduct?.marca || ''} />
           </div>
-          {/* Preço */}
           <div>
             <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Preço (€) *</label>
             <input className="input" name="preco" ref={precoRef} defaultValue={editingProduct?.preco || ''} />
           </div>
-          {/* Categoria */}
           <div>
             <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Categoria *</label>
             <select className="input" name="category_id" ref={categoryIdRef} defaultValue={editingProduct?.category_id || ''} disabled={loadingCats}>
@@ -560,7 +516,7 @@ export default function AdminProducts({ embedded = false }) {
               ))}
             </select>
           </div>
-          {/* Tamanhos */}
+
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
               Tamanhos (separados por vírgula)
@@ -574,7 +530,6 @@ export default function AdminProducts({ embedded = false }) {
             />
           </div>
 
-          {/* Imagens existentes (em modo de edição) com arrastar para reordenar */}
           {editingProduct && existingImages.length > 0 && (
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
@@ -619,7 +574,6 @@ export default function AdminProducts({ embedded = false }) {
                           setModalImage(fullImageUrl);
                         }}
                       />
-                      {/* Botão para remover a imagem */}
                       <button
                         type="button"
                         onClick={() => removeExistingImage(img.image_id)}
@@ -651,7 +605,6 @@ export default function AdminProducts({ embedded = false }) {
             </div>
           )}
 
-          {/* Upload de novas imagens */}
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
               {editingProduct ? 'Adicionar novas imagens (opcional, até 6)' : 'Imagens (até 6)'}
@@ -666,13 +619,11 @@ export default function AdminProducts({ embedded = false }) {
             )}
           </div>
 
-          {/* Descrição */}
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Descrição</label>
             <input className="input" name="descricao" ref={descricaoRef} defaultValue={editingProduct?.descricao || ''} />
           </div>
 
-          {/* Botões de ação */}
           <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             {editingProduct && (
               <button type="button" className="btn btn-ghost" onClick={cancelEdit}>
@@ -686,7 +637,6 @@ export default function AdminProducts({ embedded = false }) {
         </form>
       </div>
 
-      {/* Tabela com a lista de produtos */}
       <div className="card" style={{ padding: 12, marginTop: 16, overflowX: 'auto' }}>
         {loading ? (
           <p style={{ color: 'var(--muted)' }}>A carregar...</p>
@@ -745,7 +695,6 @@ export default function AdminProducts({ embedded = false }) {
         )}
       </div>
 
-      {/* Modal para ampliar imagem (clique na miniatura) */}
       {modalImage && (
         <ImageModal src={modalImage} alt="Produto" onClose={() => setModalImage(null)} />
       )}
@@ -786,36 +735,8 @@ export default function AdminProducts({ embedded = false }) {
               Deseja salvar as alterações no produto <strong>“{editingProduct?.nome || ''}”</strong>?
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                onClick={cancelConfirm}
-                style={{
-                  background: '#e0e0e0',
-                  color: '#333',
-                  border: 'none',
-                  borderRadius: '40px',
-                  padding: '10px 24px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmEdit}
-                style={{
-                  background: '#646cff',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '40px',
-                  padding: '10px 24px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Confirmar
-              </button>
+              <button onClick={cancelConfirm} style={{ background: '#e0e0e0', color: '#333', border: 'none', borderRadius: '40px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
+              <button onClick={confirmEdit} style={{ background: '#646cff', color: '#fff', border: 'none', borderRadius: '40px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontWeight: 600 }}>Confirmar</button>
             </div>
           </div>
         </div>
@@ -857,42 +778,68 @@ export default function AdminProducts({ embedded = false }) {
               Tem a certeza que deseja eliminar o produto <strong>“{deleteTargetName}”</strong> (#{deleteTargetId})?
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                onClick={cancelDelete}
-                style={{
-                  background: '#e0e0e0',
-                  color: '#333',
-                  border: 'none',
-                  borderRadius: '40px',
-                  padding: '10px 24px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                style={{
-                  background: '#ff4444',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '40px',
-                  padding: '10px 24px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                Eliminar
-              </button>
+              <button onClick={cancelDelete} style={{ background: '#e0e0e0', color: '#333', border: 'none', borderRadius: '40px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
+              <button onClick={confirmDelete} style={{ background: '#ff4444', color: '#fff', border: 'none', borderRadius: '40px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontWeight: 600 }}>Eliminar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de sucesso (para criação e edição) */}
+      {/* Modal de erro ao eliminar (produto com encomendas) - em azul bebé */}
+      {showDeleteErrorModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+          }}
+          onClick={closeDeleteErrorModal}
+        >
+          <div
+            style={{
+              backgroundColor: '#E6F2FF',
+              borderRadius: '16px',
+              padding: '32px 24px',
+              maxWidth: '440px',
+              width: '100%',
+              textAlign: 'center',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '36px', marginBottom: '8px' }}>⚠️</div>
+            <h3 style={{ margin: '0 0 8px', color: '#1a1a1a' }}>Não é possível apagar</h3>
+            <p style={{ color: '#333', fontSize: '15px', lineHeight: '1.5', marginBottom: '20px' }}>
+              Este produto está associado a uma ou mais encomendas. Não pode ser apagado enquanto existirem registos de compras associados.
+            </p>
+            <button
+              onClick={closeDeleteErrorModal}
+              style={{
+                background: '#4A90D9',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '40px',
+                padding: '10px 32px',
+                fontSize: '15px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de sucesso (criação, edição ou eliminação) */}
       {showSuccessModal && (
         <div
           style={{
@@ -922,17 +869,28 @@ export default function AdminProducts({ embedded = false }) {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>{successData.isEdit ? '✅' : '🎉'}</div>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
             <h3 style={{ margin: '0 0 8px', color: '#1a1a1a' }}>
-              {successData.isEdit ? 'Produto atualizado com sucesso!' : 'Produto criado com sucesso!'}
+              {successData.isDelete
+                ? 'Produto apagado com sucesso!'
+                : successData.isEdit
+                ? 'Produto atualizado com sucesso!'
+                : 'Produto criado com sucesso!'}
             </h3>
-            <p style={{ color: '#555', fontSize: '15px', lineHeight: '1.6', marginBottom: '20px' }}>
-              <strong>{successData.nome}</strong>
-              <br />
-              Marca: <strong>{successData.marca}</strong>
-              <br />
-              Preço: <strong>€{successData.preco.toFixed(2)}</strong>
-            </p>
+            {!successData.isDelete && (
+              <p style={{ color: '#555', fontSize: '15px', lineHeight: '1.6', marginBottom: '20px' }}>
+                <strong>{successData.nome}</strong>
+                <br />
+                Marca: <strong>{successData.marca}</strong>
+                <br />
+                Preço: <strong>€{successData.preco.toFixed(2)}</strong>
+              </p>
+            )}
+            {successData.isDelete && (
+              <p style={{ color: '#555', fontSize: '15px', lineHeight: '1.6', marginBottom: '20px' }}>
+                O produto <strong>“{successData.nome}”</strong> foi removido com sucesso.
+              </p>
+            )}
             <button
               onClick={closeSuccessModal}
               style={{

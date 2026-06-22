@@ -1,17 +1,21 @@
 // Register.jsx
 // Página de registo com verificação de email.
+// Aceita estado da navegação (ex: vindo do Login) para preencher email e ir diretamente para a verificação.
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom'; // <-- adicionado useLocation
 import { api } from '../api/client';
 import { registerUser } from '../services/auth';
 
 export default function Register() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const locationState = location.state || {};
+
     const [formData, setFormData] = useState({
         primeiro_nome: '',
         ultimo_nome: '',
-        email: '',
+        email: locationState.email || '',   // preenchido se vier do login
         password: '',
         confirm_password: '',
         morada: '',
@@ -22,11 +26,24 @@ export default function Register() {
     });
     const [districts, setDistricts] = useState([]);
     const [municipalities, setMunicipalities] = useState([]);
-    const [step, setStep] = useState('register');
+    const [step, setStep] = useState(locationState.step || 'register');
     const [verificationCode, setVerificationCode] = useState('');
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
-    const [registeredEmail, setRegisteredEmail] = useState('');
+    const [registeredEmail, setRegisteredEmail] = useState(locationState.email || '');
+
+    // Se recebermos estado a indicar que devemos ir diretamente para verificação,
+    // atualizamos o passo e o email (caso ainda não esteja definido).
+    useEffect(() => {
+        if (locationState.step === 'verify' && locationState.email) {
+            setRegisteredEmail(locationState.email);
+            setStep('verify');
+            // Se o email não estiver já no formData, preenchemo-lo
+            if (!formData.email) {
+                setFormData(prev => ({ ...prev, email: locationState.email }));
+            }
+        }
+    }, [locationState]);
 
     // Carregar distritos
     useEffect(() => {
@@ -63,12 +80,10 @@ export default function Register() {
         loadMunicipalities();
     }, [formData.distrito, districts]);
 
-    // Handler genérico para os campos normais
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // Handler específico para código postal (apenas números e insere hífen)
     const handleCodigoPostalChange = (e) => {
         let value = e.target.value.replace(/\D/g, '');
         if (value.length > 4) {
@@ -77,7 +92,6 @@ export default function Register() {
         setFormData({ ...formData, codigo_postal: value });
     };
 
-    // Handler específico para telefone (apenas números, máximo 9 dígitos)
     const handleTelefoneChange = (e) => {
         const numericValue = e.target.value.replace(/\D/g, '');
         if (numericValue.length <= 9) {
@@ -92,7 +106,6 @@ export default function Register() {
         setError('');
         setMessage('');
 
-        // Validações locais
         if (formData.password !== formData.confirm_password) {
             setError('As palavras-passe não coincidem.');
             return;
@@ -178,8 +191,6 @@ export default function Register() {
                             <input type="password" name="password" placeholder="Palavra-passe *" value={formData.password} onChange={handleChange} className="input" required />
                             <input type="password" name="confirm_password" placeholder="Confirmar palavra-passe *" value={formData.confirm_password} onChange={handleChange} className="input" required />
                             <input type="text" name="morada" placeholder="Morada *" value={formData.morada} onChange={handleChange} className="input" required />
-                            
-                            {/* Código postal com formatação automática e limite de 8 caracteres */}
                             <input
                                 type="text"
                                 name="codigo_postal"
@@ -190,7 +201,6 @@ export default function Register() {
                                 required
                                 maxLength={8}
                             />
-
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <select name="distrito" value={formData.distrito} onChange={handleChange} className="input" required>
                                     <option value="">Selecionar distrito</option>
@@ -205,8 +215,6 @@ export default function Register() {
                                     ))}
                                 </select>
                             </div>
-
-                            {/* Telemóvel – apenas números e máximo 9 dígitos */}
                             <input
                                 type="tel"
                                 name="telefone"
