@@ -1,7 +1,3 @@
-// ProductDetails.jsx
-// Página de detalhes de um produto, com galeria de imagens, seleção de tamanho,
-// compra, exibição de reviews e envio de nova review.
-
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProductById } from '../api/products';
@@ -9,16 +5,12 @@ import { createOrder } from '../api/orders';
 import { createReview, getReviewsByProduct } from '../api/reviews';
 import ImageModal from '../components/ImageModal';
 
-// ------------------------------------------------------------
-// Verifica se a sessão do utilizador ainda é válida
 function isSessionValid() {
     const userId = localStorage.getItem('user_id');
     const expiresAt = Number(localStorage.getItem('auth_expires_at') || 0);
     return !!userId && Date.now() < expiresAt;
 }
 
-// ------------------------------------------------------------
-// Componente de estrelas (rating), com suporte para leitura e edição
 function Stars({ value = 0, onChange, size = 22, readOnly = false }) {
     const v = Number(value) || 0;
     return (
@@ -55,9 +47,6 @@ function Stars({ value = 0, onChange, size = 22, readOnly = false }) {
     );
 }
 
-// ------------------------------------------------------------
-// Função auxiliar para obter a URL completa da imagem do produto.
-// Se já for uma URL absoluta (http/https), mantém; caso contrário, adiciona a base da API.
 function getFullImageUrl(imagePath) {
     if (!imagePath) return '';
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
@@ -66,14 +55,10 @@ function getFullImageUrl(imagePath) {
     return `${import.meta.env.VITE_API_URL}${imagePath}`;
 }
 
-// ------------------------------------------------------------
-// Componente principal: detalhes do produto
 export default function ProductDetails() {
-    // Obtém o ID do produto a partir dos parâmetros da URL
     const { id } = useParams();
     const navigate = useNavigate();
 
-    // Estados para o produto, carregamento, erro e imagem principal
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -81,34 +66,26 @@ export default function ProductDetails() {
     const [modalImage, setModalImage] = useState(null);
     const [selectedSize, setSelectedSize] = useState(null);
 
-    // Estados para a compra
     const [buying, setBuying] = useState(false);
     const [buyError, setBuyError] = useState('');
 
-    // Estados para reviews
     const [reviews, setReviews] = useState([]);
     const [loadingReviews, setLoadingReviews] = useState(true);
     const [reviewError, setReviewError] = useState('');
 
-    // Estados para envio de nova review
     const [rating, setRating] = useState(5);
     const [comentario, setComentario] = useState('');
     const [sendingReview, setSendingReview] = useState(false);
     const [sendingReviewError, setSendingReviewError] = useState('');
 
-    // Obtém o user_id do localStorage
     const user_id = localStorage.getItem('user_id');
-
-    // Verifica se o utilizador pode comprar (sessão válida)
     const canBuy = useMemo(() => isSessionValid(), []);
 
-    // Verifica se o utilizador já fez uma review para este produto
     const hasReviewed = useMemo(() => {
         if (!user_id) return false;
         return (reviews || []).some((r) => Number(r.user_id) === Number(user_id));
     }, [reviews, user_id]);
 
-    // Calcula a média das classificações
     const avgRating = useMemo(() => {
         if (!reviews?.length) return 0;
         const sum = reviews.reduce(
@@ -118,8 +95,8 @@ export default function ProductDetails() {
         return Math.round((sum / reviews.length) * 10) / 10;
     }, [reviews]);
 
-    // ------------------------------------------------------------
-    // Função que carrega os dados do produto
+    const [refreshKey, setRefreshKey] = useState(0);
+
     async function loadProduct() {
         try {
             setLoading(true);
@@ -128,7 +105,6 @@ export default function ProductDetails() {
             const normalized = Array.isArray(data) ? data[0] : data;
             setProduct(normalized || null);
             
-            // Define a imagem principal (primeira ou a marcada como primary)
             if (normalized?.images && normalized.images.length > 0) {
                 const primary = normalized.images.find(img => img.is_primary) || normalized.images[0];
                 setMainImage(primary.image_url);
@@ -144,13 +120,11 @@ export default function ProductDetails() {
         }
     }
 
-    // Função que carrega as reviews do produto
     async function loadReviews() {
         try {
             setLoadingReviews(true);
             setReviewError('');
             const data = await getReviewsByProduct(id);
-            // Normaliza a resposta (pode ser array ou objeto com propriedade 'reviews')
             const list = Array.isArray(data)
                 ? data
                 : Array.isArray(data?.reviews)
@@ -165,7 +139,6 @@ export default function ProductDetails() {
         }
     }
 
-    // useEffect para carregar produto e reviews ao montar ou quando o ID mudar
     useEffect(() => {
         let alive = true;
         (async () => {
@@ -173,18 +146,19 @@ export default function ProductDetails() {
             if (alive) await loadReviews();
         })();
         return () => { alive = false; };
-    }, [id]);
+    }, [id, refreshKey]);
 
-    // ------------------------------------------------------------
-    // Função que trata da compra do produto
+    useEffect(() => {
+        setRefreshKey(prev => prev + 1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     async function handleBuy() {
-        // Verifica se a sessão é válida
         if (!isSessionValid()) {
             setBuyError('Tens de iniciar sessão para comprar. (Sessão expirada ou não iniciada)');
             navigate('/login');
             return;
         }
-        // Verifica se foi selecionado um tamanho
         if (!selectedSize) {
             setBuyError('Por favor, seleciona um tamanho antes de comprar.');
             return;
@@ -198,9 +172,7 @@ export default function ProductDetails() {
         try {
             setBuying(true);
             setBuyError('');
-            // Cria a encomenda com o tamanho selecionado
             const response = await createOrder(Number(uid), Number(product.product_id), selectedSize);
-            // Redireciona para o checkout passando o valor e o nome do produto
             navigate(`/checkout/${response.order_id}`, {
                 state: {
                     amount: product.preco,
@@ -214,22 +186,17 @@ export default function ProductDetails() {
         }
     }
 
-    // ------------------------------------------------------------
-    // Função que envia uma nova review
     async function handleSubmitReview(e) {
         e.preventDefault();
-        // Valida se o utilizador está autenticado
         if (!user_id) {
             alert('Tens de fazer login (definir user_id) para escrever uma review.');
             return;
         }
-        // Verifica se já escreveu review para este produto
         if (hasReviewed) {
             setSendingReviewError('Já escreveste uma review para este produto.');
             return;
         }
         if (!product?.product_id) return;
-        // Valida a pontuação
         if (!rating || Number(rating) < 1 || Number(rating) > 5) {
             setSendingReviewError('Escolhe uma pontuação entre 1 e 5.');
             return;
@@ -241,14 +208,12 @@ export default function ProductDetails() {
         try {
             setSendingReview(true);
             setSendingReviewError('');
-            // Envia a review para a API
             await createReview({
                 user_id: Number(user_id),
                 product_id: Number(product.product_id),
                 rating: Number(rating),
                 comentario: comentario.trim(),
             });
-            // Limpa o formulário e recarrega as reviews
             setComentario('');
             setRating(5);
             await loadReviews();
@@ -264,8 +229,6 @@ export default function ProductDetails() {
         }
     }
 
-    // ------------------------------------------------------------
-    // Renderiza estados de carregamento e erro (product)
     if (loading) {
         return (
             <div className="container" style={{ padding: '32px 0' }}>
@@ -288,13 +251,10 @@ export default function ProductDetails() {
         );
     }
 
-    // Normaliza a lista de imagens
     const imagesArray = product.images && product.images.length > 0 
         ? product.images 
         : (product.imagem ? [{ image_url: product.imagem, is_primary: true }] : []);
 
-    // ------------------------------------------------------------
-    // Renderização principal
     return (
         <div className="container" style={{ padding: '32px 0' }}>
             <div
@@ -305,9 +265,7 @@ export default function ProductDetails() {
                     alignItems: 'start',
                 }}
             >
-                {/* GALERIA DE IMAGENS */}
                 <div className="card" style={{ padding: 12 }}>
-                    {/* Imagem principal (clicável para abrir modal) */}
                     <div
                         style={{
                             aspectRatio: '1 / 1',
@@ -330,7 +288,6 @@ export default function ProductDetails() {
                         )}
                     </div>
 
-                    {/* Miniaturas das imagens */}
                     {imagesArray.length > 1 && (
                         <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
                             {imagesArray.map((img) => (
@@ -354,12 +311,10 @@ export default function ProductDetails() {
                     )}
                 </div>
 
-                {/* INFORMAÇÕES DO PRODUTO */}
                 <div>
                     <h1 style={{ marginTop: 0 }}>{product.nome}</h1>
                     <div style={{ color: 'var(--muted)', marginTop: 6 }}>{product.marca}</div>
 
-                    {/* Média de estrelas */}
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Stars value={Math.round(avgRating)} readOnly />
                         <div style={{ color: 'var(--muted)' }}>
@@ -373,12 +328,10 @@ export default function ProductDetails() {
                         </div>
                     </div>
 
-                    {/* Preço */}
                     <div style={{ marginTop: 16, fontSize: 22, fontWeight: 900 }}>
                         €{product.preco}
                     </div>
 
-                    {/* Descrição */}
                     {product.descricao ? (
                         <p style={{ color: 'var(--muted)', marginTop: 16, lineHeight: 1.6 }}>
                             {product.descricao}
@@ -389,7 +342,6 @@ export default function ProductDetails() {
                         </p>
                     )}
 
-                    {/* Seleção de tamanhos (se existir) */}
                     {product.tamanhos && (
                         <div style={{ marginTop: 16 }}>
                             <div style={{ fontWeight: 700, marginBottom: 8 }}>Tamanhos disponíveis:</div>
@@ -418,7 +370,6 @@ export default function ProductDetails() {
                         </div>
                     )}
 
-                    {/* Botão de compra */}
                     <div style={{ marginTop: 20, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                         <button
                             className="btn btn-primary"
@@ -430,26 +381,21 @@ export default function ProductDetails() {
                         </button>
                     </div>
 
-                    {/* Mensagem de sessão inválida */}
                     {!isSessionValid() && (
                         <p style={{ color: 'salmon', marginTop: 12 }}>
                             Tens de iniciar sessão para comprar. A tua sessão expira em 10 minutos.
                         </p>
                     )}
 
-                    {/* Erro na compra */}
                     {buyError && <p style={{ color: 'salmon', marginTop: 12 }}>{buyError}</p>}
                 </div>
             </div>
 
-            {/* Modal para ver imagem em tamanho grande */}
             {modalImage && (
                 <ImageModal src={modalImage} alt={product.nome} onClose={() => setModalImage(null)} />
             )}
 
-            {/* SECÇÃO DE REVIEWS */}
             <div style={{ marginTop: 28 }}>
-                {/* Lista de reviews */}
                 <div className="card" style={{ padding: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
                         <div>
@@ -502,7 +448,6 @@ export default function ProductDetails() {
                     )}
                 </div>
 
-                {/* Formulário para escrever nova review */}
                 <div className="card" style={{ padding: 14, marginTop: 12 }}>
                     <h3 style={{ marginTop: 0 }}>Escrever uma review</h3>
 

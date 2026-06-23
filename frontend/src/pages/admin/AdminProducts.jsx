@@ -1,7 +1,4 @@
 // AdminProducts.jsx
-// Página de administração de produtos com CRUD completo, pesquisa, filtros, ordenação,
-// gestão de imagens (arrastar/reordenar, adicionar/remover) e modais de confirmação.
-
 import { useEffect, useMemo, useState, useRef, useCallback, memo } from 'react';
 import { api } from '../../api/client';
 import {
@@ -14,14 +11,11 @@ import {
 } from '../../api/admin';
 import ImageModal from '../../components/ImageModal';
 
-// ------------------------------------------------------------
-// Verifica se existe uma chave de administrador válida no localStorage
 function requireAdminKey() {
   const key = localStorage.getItem('admin_key');
   return !!key && key.trim().length > 0;
 }
 
-// Opções de ordenação disponíveis para a lista de produtos
 const SORT_OPTIONS = [
   { value: 'id_desc', label: 'ID: mais recente primeiro' },
   { value: 'id_asc', label: 'ID: mais antigo primeiro' },
@@ -31,8 +25,6 @@ const SORT_OPTIONS = [
   { value: 'price_desc', label: 'Preço: maior → menor' },
 ];
 
-// ------------------------------------------------------------
-// Componente de barra de pesquisa (memoizado para evitar re-renders desnecessários)
 const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands }) => {
   const [localSearch, setLocalSearch] = useState(filters.search || '');
   const debounceTimer = useRef(null);
@@ -118,7 +110,206 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
 });
 
 // ------------------------------------------------------------
-// Componente principal de gestão de produtos (admin)
+// Componente de formulário ISOLADO (memoizado) – NUNCA perde o foco
+const ProductForm = memo(({
+  editingProduct,
+  categories,
+  loadingCats,
+  onRequestConfirm,
+  onCancel,
+  submitting,
+  existingImages,
+  setExistingImages,
+  imageFiles,
+  previewUrls,
+  handleImageChange,
+  removeExistingImage,
+  setModalImage,
+}) => {
+  // REFS para os campos – sem estado, sem re-renderização
+  const nomeRef = useRef(null);
+  const marcaRef = useRef(null);
+  const precoRef = useRef(null);
+  const descricaoRef = useRef(null);
+  const categoryIdRef = useRef(null);
+  const tamanhosRef = useRef(null);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Lê valores das refs e pede confirmação ao pai
+    const data = {
+      nome: nomeRef.current?.value || '',
+      marca: marcaRef.current?.value || '',
+      preco: precoRef.current?.value || '',
+      descricao: descricaoRef.current?.value || '',
+      category_id: categoryIdRef.current?.value || '',
+      tamanhos: tamanhosRef.current?.value || '',
+    };
+    onRequestConfirm(data);
+  };
+
+  return (
+    <div className="card admin-product-form" style={{ padding: 14, marginTop: 16 }}>
+      <div style={{ fontWeight: 900, marginBottom: 10 }}>
+        {editingProduct ? '✏️ Editar produto' : '➕ Criar produto'}
+      </div>
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Nome *</label>
+          <input className="input" name="nome" ref={nomeRef} defaultValue={editingProduct?.nome || ''} required />
+        </div>
+        <div>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Marca *</label>
+          <input className="input" name="marca" ref={marcaRef} defaultValue={editingProduct?.marca || ''} required />
+        </div>
+        <div>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Preço (€) *</label>
+          <input
+            className="input"
+            name="preco"
+            type="text"
+            ref={precoRef}
+            defaultValue={editingProduct?.preco || ''}
+            required
+            placeholder="Ex: 99.99"
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Categoria *</label>
+          <select
+            className="input"
+            name="category_id"
+            ref={categoryIdRef}
+            defaultValue={editingProduct?.category_id || ''}
+            disabled={loadingCats}
+            required
+          >
+            <option value="">{loadingCats ? 'A carregar...' : 'Seleciona uma categoria'}</option>
+            {categories.map(c => (
+              <option key={c.category_id} value={c.category_id}>{c.nome} (#{c.category_id})</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Tamanhos (separados por vírgula)</label>
+          <input
+            className="input"
+            name="tamanhos"
+            ref={tamanhosRef}
+            defaultValue={editingProduct?.tamanhos || ''}
+            placeholder="Ex: XS,S,M,L,XL"
+          />
+        </div>
+
+        {editingProduct && existingImages.length > 0 && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
+              Imagens atuais (arraste para reordenar | clique na imagem para ampliar | ✖ para remover)
+            </label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} onDragOver={(e) => e.preventDefault()}>
+              {existingImages.map((img, index) => {
+                const fullImageUrl = img.image_url.startsWith('http')
+                  ? img.image_url
+                  : `${import.meta.env.VITE_API_URL}${img.image_url}`;
+                return (
+                  <div
+                    key={img.image_id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', index);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                      if (isNaN(fromIndex)) return;
+                      const toIndex = index;
+                      if (fromIndex === toIndex) return;
+                      const reordered = [...existingImages];
+                      const [moved] = reordered.splice(fromIndex, 1);
+                      reordered.splice(toIndex, 0, moved);
+                      setExistingImages(reordered);
+                    }}
+                    style={{ position: 'relative', cursor: 'grab' }}
+                  >
+                    <img
+                      src={fullImageUrl}
+                      alt="miniatura"
+                      style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, pointerEvents: 'auto' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setModalImage(fullImageUrl);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeExistingImage(img.image_id)}
+                      style={{
+                        position: 'absolute',
+                        top: -8,
+                        right: -8,
+                        background: 'red',
+                        color: 'white',
+                        borderRadius: '50%',
+                        width: 24,
+                        height: 24,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: 16,
+                        fontWeight: 'bold',
+                        zIndex: 10,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
+            {editingProduct ? 'Adicionar novas imagens (opcional, até 6)' : 'Imagens (até 6)'}
+          </label>
+          <input type="file" multiple accept="image/*" onChange={handleImageChange} className="input" />
+          {previewUrls.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {previewUrls.map((url, idx) => (
+                <img key={idx} src={url} alt="pré-visualização" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Descrição</label>
+          <input className="input" name="descricao" ref={descricaoRef} defaultValue={editingProduct?.descricao || ''} />
+        </div>
+
+        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+          {editingProduct && (
+            <button type="button" className="btn btn-ghost" onClick={onCancel}>
+              Cancelar edição
+            </button>
+          )}
+          <button className="btn btn-primary" type="submit" disabled={submitting}>
+            {submitting ? (editingProduct ? 'A atualizar...' : 'A criar...') : (editingProduct ? 'Atualizar produto' : 'Criar produto')}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+});
+
+// ------------------------------------------------------------
+// Componente principal
 export default function AdminProducts({ embedded = false }) {
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -140,16 +331,12 @@ export default function AdminProducts({ embedded = false }) {
   const [existingImages, setExistingImages] = useState([]);
   const [modalImage, setModalImage] = useState(null);
 
-  const nomeRef = useRef('');
-  const marcaRef = useRef('');
-  const precoRef = useRef('');
-  const descricaoRef = useRef('');
-  const categoryIdRef = useRef('');
-  const tamanhosRef = useRef('');
-
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // Estado para guardar os dados do formulário antes da confirmação
+  const [pendingFormData, setPendingFormData] = useState(null);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -162,7 +349,7 @@ export default function AdminProducts({ embedded = false }) {
     marca: '',
     preco: 0,
     isEdit: false,
-    isDelete: false, // <-- novo campo para identificar eliminação
+    isDelete: false,
   });
 
   const hasKey = useMemo(() => requireAdminKey(), []);
@@ -258,12 +445,6 @@ export default function AdminProducts({ embedded = false }) {
       }
       const fullProduct = await getAdminProductById(productId);
       setEditingProduct(fullProduct);
-      if (nomeRef.current) nomeRef.current.value = fullProduct.nome || '';
-      if (marcaRef.current) marcaRef.current.value = fullProduct.marca || '';
-      if (precoRef.current) precoRef.current.value = fullProduct.preco || '';
-      if (descricaoRef.current) descricaoRef.current.value = fullProduct.descricao || '';
-      if (categoryIdRef.current) categoryIdRef.current.value = fullProduct.category_id || '';
-      if (tamanhosRef.current) tamanhosRef.current.value = fullProduct.tamanhos || '';
       setExistingImages(fullProduct.images || []);
       setImageFiles([]);
       setPreviewUrls([]);
@@ -276,15 +457,10 @@ export default function AdminProducts({ embedded = false }) {
 
   function cancelEdit() {
     setEditingProduct(null);
-    if (nomeRef.current) nomeRef.current.value = '';
-    if (marcaRef.current) marcaRef.current.value = '';
-    if (precoRef.current) precoRef.current.value = '';
-    if (descricaoRef.current) descricaoRef.current.value = '';
-    if (categoryIdRef.current) categoryIdRef.current.value = '';
-    if (tamanhosRef.current) tamanhosRef.current.value = '';
+    setExistingImages([]);
     setImageFiles([]);
     setPreviewUrls([]);
-    setExistingImages([]);
+    setPendingFormData(null);
   }
 
   function handleImageChange(e) {
@@ -299,12 +475,24 @@ export default function AdminProducts({ embedded = false }) {
   }
 
   // ------------------------------------------------------------
-  const openConfirmEdit = () => setShowConfirmModal(true);
+  // Pede confirmação antes de submeter
+  const onRequestConfirm = (formData) => {
+    setPendingFormData(formData);
+    setShowConfirmModal(true);
+  };
+
   const confirmEdit = async () => {
     setShowConfirmModal(false);
-    await performSubmit(true);
+    if (pendingFormData) {
+      await handleFormSubmit(pendingFormData);
+      setPendingFormData(null);
+    }
   };
-  const cancelConfirm = () => setShowConfirmModal(false);
+
+  const cancelConfirm = () => {
+    setShowConfirmModal(false);
+    setPendingFormData(null);
+  };
 
   const openDeleteConfirm = (id, nome) => {
     setDeleteTargetId(id);
@@ -320,7 +508,6 @@ export default function AdminProducts({ embedded = false }) {
       setError('');
       await deleteAdminProduct(id);
       await fetchProducts();
-      // Mostra modal de sucesso em vez de alert
       setSuccessData({
         nome: nome,
         marca: '',
@@ -330,7 +517,6 @@ export default function AdminProducts({ embedded = false }) {
       });
       setShowSuccessModal(true);
     } catch (e) {
-      // Log detalhado para depuração
       console.log('ERRO COMPLETO:', e);
       console.log('RESPONSE:', e?.response);
       console.log('DATA:', e?.response?.data);
@@ -361,31 +547,36 @@ export default function AdminProducts({ embedded = false }) {
   const closeDeleteErrorModal = () => setShowDeleteErrorModal(false);
 
   // ------------------------------------------------------------
-  const performSubmit = async (isConfirmed = false) => {
-    const nome = nomeRef.current.value;
-    const marca = marcaRef.current.value;
-    const preco = precoRef.current.value;
-    const descricao = descricaoRef.current.value;
-    const category_id = categoryIdRef.current.value;
-    const tamanhos = tamanhosRef.current.value;
+  // Submissão real (chamada após confirmação)
+  const handleFormSubmit = async (formDataRaw) => {
+    const { nome, marca, preco, descricao, category_id, tamanhos } = formDataRaw;
 
-    if (!nome || !marca || !preco || !category_id) {
+    const nomeValue = nome.trim();
+    const marcaValue = marca.trim();
+    const precoValue = preco.trim();
+    const descricaoValue = descricao.trim();
+    const categoryIdValue = category_id;
+    const tamanhosValue = tamanhos.trim();
+
+    console.log('📝 VALORES RECEBIDOS DO FORM:', { nomeValue, marcaValue, precoValue, descricaoValue, categoryIdValue, tamanhosValue });
+
+    if (!nomeValue || !marcaValue || !precoValue || !categoryIdValue) {
       setError('Nome, marca, preço e categoria são obrigatórios.');
       return;
     }
-    const precoNum = Number(preco);
+    const precoNum = Number(precoValue);
     if (isNaN(precoNum) || precoNum < 0) {
       setError('Preço inválido.');
       return;
     }
 
     const formData = new FormData();
-    formData.append('nome', nome.trim());
-    formData.append('marca', marca.trim());
+    formData.append('nome', nomeValue);
+    formData.append('marca', marcaValue);
     formData.append('preco', precoNum);
-    formData.append('descricao', descricao.trim() || '');
-    formData.append('category_id', Number(category_id));
-    formData.append('tamanhos', tamanhos);
+    formData.append('descricao', descricaoValue || '');
+    formData.append('category_id', Number(categoryIdValue));
+    formData.append('tamanhos', tamanhosValue || '');
     imageFiles.forEach(file => formData.append('images', file));
 
     try {
@@ -403,10 +594,21 @@ export default function AdminProducts({ embedded = false }) {
         const newOrder = existingImages.map(img => img.image_id);
         formData.append('imagesOrder', JSON.stringify(newOrder));
 
+        console.log('📤 A enviar para update:', {
+          nome: nomeValue,
+          marca: marcaValue,
+          preco: precoNum,
+          descricao: descricaoValue,
+          category_id: categoryIdValue,
+          tamanhos: tamanhosValue,
+          imagesToDelete,
+          imagesOrder: newOrder
+        });
+
         await updateAdminProduct(productId, formData);
         setSuccessData({
-          nome: nome.trim(),
-          marca: marca.trim(),
+          nome: nomeValue,
+          marca: marcaValue,
           preco: precoNum,
           isEdit: true,
           isDelete: false,
@@ -416,21 +618,14 @@ export default function AdminProducts({ embedded = false }) {
       } else {
         await createAdminProduct(formData);
         setSuccessData({
-          nome: nome.trim(),
-          marca: marca.trim(),
+          nome: nomeValue,
+          marca: marcaValue,
           preco: precoNum,
           isEdit: false,
           isDelete: false,
         });
         setShowSuccessModal(true);
-        nomeRef.current.value = '';
-        marcaRef.current.value = '';
-        precoRef.current.value = '';
-        descricaoRef.current.value = '';
-        categoryIdRef.current.value = '';
-        tamanhosRef.current.value = '';
-        setImageFiles([]);
-        setPreviewUrls([]);
+        cancelEdit();
       }
       await fetchProducts();
     } catch (err) {
@@ -439,15 +634,6 @@ export default function AdminProducts({ embedded = false }) {
       setError(`Falha ao ${editingProduct ? 'atualizar' : 'criar'} produto. ${status ? `(HTTP ${status})` : ''} ${msg ? `- ${msg}` : ''}`);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (editingProduct) {
-      openConfirmEdit();
-    } else {
-      performSubmit();
     }
   };
 
@@ -490,152 +676,22 @@ export default function AdminProducts({ embedded = false }) {
         brands={brands}
       />
 
-      <div className="card admin-product-form" style={{ padding: 14, marginTop: 16 }}>
-        <div style={{ fontWeight: 900, marginBottom: 10 }}>
-          {editingProduct ? '✏️ Editar produto' : '➕ Criar produto'}
-        </div>
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Nome *</label>
-            <input className="input" name="nome" ref={nomeRef} defaultValue={editingProduct?.nome || ''} />
-          </div>
-          <div>
-            <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Marca *</label>
-            <input className="input" name="marca" ref={marcaRef} defaultValue={editingProduct?.marca || ''} />
-          </div>
-          <div>
-            <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Preço (€) *</label>
-            <input className="input" name="preco" ref={precoRef} defaultValue={editingProduct?.preco || ''} />
-          </div>
-          <div>
-            <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Categoria *</label>
-            <select className="input" name="category_id" ref={categoryIdRef} defaultValue={editingProduct?.category_id || ''} disabled={loadingCats}>
-              <option value="">{loadingCats ? 'A carregar...' : 'Seleciona uma categoria'}</option>
-              {categories.map(c => (
-                <option key={c.category_id} value={c.category_id}>{c.nome} (#{c.category_id})</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
-              Tamanhos (separados por vírgula)
-            </label>
-            <input
-              className="input"
-              name="tamanhos"
-              ref={tamanhosRef}
-              defaultValue={editingProduct?.tamanhos || ''}
-              placeholder="Ex: XS,S,M,L,XL"
-            />
-          </div>
-
-          {editingProduct && existingImages.length > 0 && (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
-                Imagens atuais (arraste para reordenar | clique na imagem para ampliar | ✖ para remover)
-              </label>
-              <div
-                style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
-                onDragOver={(e) => e.preventDefault()}
-              >
-                {existingImages.map((img, index) => {
-                  const fullImageUrl = img.image_url.startsWith('http')
-                    ? img.image_url
-                    : `${import.meta.env.VITE_API_URL}${img.image_url}`;
-                  return (
-                    <div
-                      key={img.image_id}
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', index);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-                        if (isNaN(fromIndex)) return;
-                        const toIndex = index;
-                        if (fromIndex === toIndex) return;
-                        const reordered = [...existingImages];
-                        const [moved] = reordered.splice(fromIndex, 1);
-                        reordered.splice(toIndex, 0, moved);
-                        setExistingImages(reordered);
-                      }}
-                      style={{ position: 'relative', cursor: 'grab' }}
-                    >
-                      <img
-                        src={fullImageUrl}
-                        alt="miniatura"
-                        style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, pointerEvents: 'auto' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setModalImage(fullImageUrl);
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeExistingImage(img.image_id)}
-                        style={{
-                          position: 'absolute',
-                          top: -8,
-                          right: -8,
-                          background: 'red',
-                          color: 'white',
-                          borderRadius: '50%',
-                          width: 24,
-                          height: 24,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: 16,
-                          fontWeight: 'bold',
-                          zIndex: 10,
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
-              {editingProduct ? 'Adicionar novas imagens (opcional, até 6)' : 'Imagens (até 6)'}
-            </label>
-            <input type="file" multiple accept="image/*" onChange={handleImageChange} className="input" />
-            {previewUrls.length > 0 && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                {previewUrls.map((url, idx) => (
-                  <img key={idx} src={url} alt="pré-visualização" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Descrição</label>
-            <input className="input" name="descricao" ref={descricaoRef} defaultValue={editingProduct?.descricao || ''} />
-          </div>
-
-          <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-            {editingProduct && (
-              <button type="button" className="btn btn-ghost" onClick={cancelEdit}>
-                Cancelar edição
-              </button>
-            )}
-            <button className="btn btn-primary" type="submit" disabled={submitting}>
-              {submitting ? (editingProduct ? 'A atualizar...' : 'A criar...') : (editingProduct ? 'Atualizar produto' : 'Criar produto')}
-            </button>
-          </div>
-        </form>
-      </div>
+      {/* FORMULÁRIO ISOLADO – NUNCA PERDE O FOCO */}
+      <ProductForm
+        editingProduct={editingProduct}
+        categories={categories}
+        loadingCats={loadingCats}
+        onRequestConfirm={onRequestConfirm}
+        onCancel={cancelEdit}
+        submitting={submitting}
+        existingImages={existingImages}
+        setExistingImages={setExistingImages}
+        imageFiles={imageFiles}
+        previewUrls={previewUrls}
+        handleImageChange={handleImageChange}
+        removeExistingImage={removeExistingImage}
+        setModalImage={setModalImage}
+      />
 
       <div className="card" style={{ padding: 12, marginTop: 16, overflowX: 'auto' }}>
         {loading ? (

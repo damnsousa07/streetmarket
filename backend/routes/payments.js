@@ -1,7 +1,3 @@
-// ============================================================
-// ROTAS DE PAGAMENTOS (Stripe e PayPal)
-// ============================================================
-
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -9,9 +5,7 @@ const paypal = require('@paypal/checkout-server-sdk');
 const db = require('../db');
 const { sendOrderEmail } = require('../services/emailservice');
 
-// -----------------------------------------------------------------
-// CONFIGURAÇÃO DO CLIENTE PAYPAL (modo sandbox)
-// -----------------------------------------------------------------
+// Configurar PayPal (sandbox)
 let paypalClient;
 try {
   const environment = new paypal.core.SandboxEnvironment(
@@ -23,72 +17,7 @@ try {
   console.error('Erro ao configurar PayPal:', error);
 }
 
-// ============================================================
-// FUNÇÃO AUXILIAR: Enviar confirmação de compra (email + notificação)
-// ============================================================
-async function sendOrderConfirmation(orderId) {
-  try {
-    // Buscar dados da encomenda, produto e utilizador
-    const [orders] = await db.promise().query(
-      `SELECT o.*, p.nome as product_nome, p.product_id, p.imagem, p.preco, 
-              u.email, u.primeiro_nome, u.nome as user_nome
-       FROM FakeOrders o
-       JOIN Products p ON o.product_id = p.product_id
-       JOIN Users u ON o.user_id = u.user_id
-       WHERE o.order_id = ?`,
-      [orderId]
-    );
-    if (orders.length === 0) return;
-    const order = orders[0];
-
-    // Formatar data
-    const orderDate = new Date().toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric' });
-
-    // Construir imagem do produto
-    let imageUrl = '';
-    if (order.imagem) {
-      let raw = order.imagem.trim();
-      if (raw.startsWith('http')) {
-        imageUrl = raw;
-      } else {
-        let clean = raw.replace(/^\/+/, '');
-        if (!clean.startsWith('uploads/')) clean = 'uploads/' + clean;
-        imageUrl = `http://localhost:3000/${clean}`;
-      }
-    }
-
-    // Enviar email de confirmação (com review block)
-    await sendOrderEmail({
-      to: order.email,
-      nomeCliente: order.primeiro_nome || order.user_nome,
-      logoUrl: process.env.LOGO_URL || 'http://localhost:5173/LogoStreetmarket.png',
-      corPrimaria: process.env.PRIMARY_COLOR || '#007bff',
-      orderNumber: orderId.toString(),
-      orderDate,
-      items: [{ nome: order.product_nome, preco: order.preco, quantidade: 1 }],
-      total: order.preco,
-      produtoImagem: imageUrl,
-      marca: 'StreetMarket',
-      reviewProductId: order.product_id,
-      reviewProductName: order.product_nome
-    });
-
-    // Criar notificação interna
-    const mensagem = `Encomendaste o produto '${order.product_nome}' no valor de €${order.preco}, iremos atualizar-te em breve.`;
-    await db.promise().query(
-      'INSERT INTO Notifications (user_id, tipo, conteudo, data_envio) VALUES (?, ?, ?, NOW())',
-      [order.user_id, 'Encomenda', mensagem]
-    );
-  } catch (err) {
-    console.error('Erro ao enviar confirmação de compra:', err);
-  }
-}
-
-// ============================================================
-// ROTAS STRIPE
-// ============================================================
-
-// POST /payments/create-payment-intent – Criar intenção de pagamento (Stripe)
+// ---------- STRIPE ----------
 router.post('/create-payment-intent', async (req, res) => {
   const { amount, orderId, user_id } = req.body;
   if (!amount || amount <= 0) {
@@ -107,7 +36,7 @@ router.post('/create-payment-intent', async (req, res) => {
   }
 });
 
-// POST /payments/stripe-webhook – Webhook para confirmação de pagamento (Stripe)
+// Webhook do Stripe (para confirmar pagamento)
 router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
@@ -118,22 +47,21 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
   }
   if (event.type === 'payment_intent.succeeded') {
     const { orderId, user_id } = event.data.object.metadata;
-    // Atualizar a encomenda para status_id = 2 (Comprado/Confirmado)
-    await db.promise().query(
-      'UPDATE FakeOrders SET status_id = 2, payment_method = "stripe" WHERE order_id = ?',
-      [orderId]
-    );
-    // ----- ENVIAR CONFIRMAÇÃO (EMAIL + NOTIFICAÇÃO) -----
-    await sendOrderConfirmation(orderId);
+    await db.promise().query('UPDATE FakeOrders SET status_id = 2, payment_method = "stripe" WHERE order_id = ?', [orderId]);
+    // Enviar email de confirmação (buscar dados)
+    const [orders] = await db.promise().query('SELECT * FROM FakeOrders WHERE order_id = ?', [orderId]);
+    if (orders.length > 0) {
+      const [users] = await db.promise().query('SELECT * FROM Users WHERE user_id = ?', [user_id]);
+      const [products] = await db.promise().query('SELECT * FROM Products WHERE product_id = ?', [orders[0].product_id]);
+      if (users.length && products.length) {
+        // chamar sendOrderEmail com os dados (igual ao que já usas)
+      }
+    }
   }
   res.json({ received: true });
 });
 
-// ============================================================
-// ROTAS PAYPAL
-// ============================================================
-
-// POST /payments/create-paypal-order – Criar ordem PayPal
+// ---------- PAYPAL ----------
 router.post('/create-paypal-order', async (req, res) => {
   const { amount, orderId, user_id } = req.body;
   if (!amount || amount <= 0) {
@@ -155,7 +83,7 @@ router.post('/create-paypal-order', async (req, res) => {
   try {
     const order = await paypalClient.execute(request);
     const approvalUrl = order.result.links.find(link => link.rel === 'approve').href;
-    res.json({
+    res.json({ 
       orderID: order.result.id,
       approvalUrl: approvalUrl
     });
@@ -165,7 +93,6 @@ router.post('/create-paypal-order', async (req, res) => {
   }
 });
 
-// POST /payments/capture-paypal-order – Capturar pagamento PayPal
 router.post('/capture-paypal-order', async (req, res) => {
   const { orderID, orderId, user_id } = req.body;
   if (!orderID || !orderId) {
@@ -175,13 +102,7 @@ router.post('/capture-paypal-order', async (req, res) => {
   try {
     const capture = await paypalClient.execute(request);
     if (capture.result.status === 'COMPLETED') {
-      // Atualizar a encomenda para status_id = 2
-      await db.promise().query(
-        'UPDATE FakeOrders SET status_id = 2, payment_method = "paypal" WHERE order_id = ?',
-        [orderId]
-      );
-      // ----- ENVIAR CONFIRMAÇÃO (EMAIL + NOTIFICAÇÃO) -----
-      await sendOrderConfirmation(orderId);
+      await db.promise().query('UPDATE FakeOrders SET status_id = 2, payment_method = "paypal" WHERE order_id = ?', [orderId]);
       res.json({ message: 'Pagamento confirmado!' });
     } else {
       res.status(400).json({ message: 'Pagamento não completado.' });

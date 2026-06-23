@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getProducts } from '../api/products';
+import * as productsApi from '../api/products';
 
 // Função auxiliar para obter a URL completa da imagem do produto.
 // Se já for uma URL absoluta (http/https), mantém; caso contrário, adiciona a base da API.
@@ -32,7 +32,7 @@ export default function Home() {
             try {
                 setLoading(true);
                 setError('');
-                const data = await getProducts(); // Busca todos os produtos da API
+                const data = await productsApi.getProducts(); // Busca todos os produtos da API
                 if (alive) setProducts(data);     // Só atualiza se o componente ainda estiver montado
             } catch (e) {
                 if (alive) setError('Não foi possível carregar os produtos.');

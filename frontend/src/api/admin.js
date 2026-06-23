@@ -35,26 +35,26 @@ export async function getAdminProducts(queryString = '') {
   });
   return res.data;
 }
-// ✅ Criar produto com FormData (múltiplas imagens)
+
 export async function createAdminProduct(formData) {
   const key = getAdminKey();
   const res = await api.post('/admin/Products', formData, {
-    headers: {
-      'x-admin-key': key,
-      // Não definir Content-Type – o axios define automaticamente como multipart/form-data
-    },
+    headers: { 'x-admin-key': key },
   });
   return res.data;
 }
 
-// ✅ Atualizar produto com FormData (adicionar novas imagens)
 export async function updateAdminProduct(id, formData) {
   const key = getAdminKey();
+  console.log('🔵 updateAdminProduct chamado com ID:', id);
+  // Log do conteúdo do FormData
+  for (let [key, value] of formData.entries()) {
+    console.log(`🔵 FormData: ${key} = ${value}`);
+  }
   const res = await api.put(`/admin/Products/${id}`, formData, {
-    headers: {
-      'x-admin-key': key,
-    },
+    headers: { 'x-admin-key': key },
   });
+  console.log('🔵 Resposta do update:', res.data);
   return res.data;
 }
 

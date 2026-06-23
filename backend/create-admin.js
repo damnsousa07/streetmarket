@@ -2,7 +2,7 @@
 const bcrypt = require('bcrypt');
 const db = require('./db');
 
-const email = 'admin@streetmarket.com';
+const email = 'streetmarketptt@gmail.com';
 const password = 'admin123';
 const nome = 'Admin StreetMarket';
 
