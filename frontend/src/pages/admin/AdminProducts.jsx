@@ -126,7 +126,6 @@ const ProductForm = memo(({
   removeExistingImage,
   setModalImage,
 }) => {
-  // REFS para os campos – sem estado, sem re-renderização
   const nomeRef = useRef(null);
   const marcaRef = useRef(null);
   const precoRef = useRef(null);
@@ -136,7 +135,6 @@ const ProductForm = memo(({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Lê valores das refs e pede confirmação ao pai
     const data = {
       nome: nomeRef.current?.value || '',
       marca: marcaRef.current?.value || '',
@@ -327,6 +325,12 @@ export default function AdminProducts({ embedded = false }) {
     sort: 'id_desc',
   });
 
+  // Estados de paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageInput, setPageInput] = useState('');
+  const limit = 12;
+
   const [editingProduct, setEditingProduct] = useState(null);
   const [existingImages, setExistingImages] = useState([]);
   const [modalImage, setModalImage] = useState(null);
@@ -335,7 +339,6 @@ export default function AdminProducts({ embedded = false }) {
   const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Estado para guardar os dados do formulário antes da confirmação
   const [pendingFormData, setPendingFormData] = useState(null);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -355,7 +358,7 @@ export default function AdminProducts({ embedded = false }) {
   const hasKey = useMemo(() => requireAdminKey(), []);
 
   // ------------------------------------------------------------
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (page = currentPage) => {
     if (!requireAdminKey()) {
       setError('Sem admin key.');
       setLoading(false);
@@ -370,8 +373,13 @@ export default function AdminProducts({ embedded = false }) {
       if (filters.min_price) params.append('min_price', filters.min_price);
       if (filters.max_price) params.append('max_price', filters.max_price);
       if (filters.sort) params.append('sort', filters.sort);
+      params.append('page', page);
+      params.append('limit', limit);
       const data = await getAdminProducts(params.toString());
-      setRows(Array.isArray(data) ? data : []);
+      setRows(data.data || []);
+      setCurrentPage(data.meta?.currentPage || 1);
+      setTotalPages(data.meta?.totalPages || 1);
+      setPageInput((data.meta?.currentPage || 1).toString());
     } catch (e) {
       const status = e?.response?.status;
       const msg = e?.response?.data?.message;
@@ -379,7 +387,7 @@ export default function AdminProducts({ embedded = false }) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, currentPage]);
 
   useEffect(() => {
     fetchProducts();
@@ -423,15 +431,17 @@ export default function AdminProducts({ embedded = false }) {
 
   const handleSearch = useCallback((searchValue) => {
     setFilters(prev => ({ ...prev, search: searchValue }));
+    setCurrentPage(1);
   }, []);
 
   const handleFilterChange = useCallback((e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
+    setCurrentPage(1);
   }, []);
 
   const handleRefresh = () => {
-    fetchProducts();
+    fetchProducts(currentPage);
   };
 
   // ------------------------------------------------------------
@@ -475,7 +485,6 @@ export default function AdminProducts({ embedded = false }) {
   }
 
   // ------------------------------------------------------------
-  // Pede confirmação antes de submeter
   const onRequestConfirm = (formData) => {
     setPendingFormData(formData);
     setShowConfirmModal(true);
@@ -507,7 +516,7 @@ export default function AdminProducts({ embedded = false }) {
     try {
       setError('');
       await deleteAdminProduct(id);
-      await fetchProducts();
+      await fetchProducts(currentPage);
       setSuccessData({
         nome: nome,
         marca: '',
@@ -547,7 +556,6 @@ export default function AdminProducts({ embedded = false }) {
   const closeDeleteErrorModal = () => setShowDeleteErrorModal(false);
 
   // ------------------------------------------------------------
-  // Submissão real (chamada após confirmação)
   const handleFormSubmit = async (formDataRaw) => {
     const { nome, marca, preco, descricao, category_id, tamanhos } = formDataRaw;
 
@@ -627,7 +635,7 @@ export default function AdminProducts({ embedded = false }) {
         setShowSuccessModal(true);
         cancelEdit();
       }
-      await fetchProducts();
+      await fetchProducts(currentPage);
     } catch (err) {
       const status = err?.response?.status;
       const msg = err?.response?.data?.message;
@@ -638,6 +646,31 @@ export default function AdminProducts({ embedded = false }) {
   };
 
   const closeSuccessModal = () => setShowSuccessModal(false);
+
+  // Paginação
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  const handlePageInputSubmit = (e) => {
+    e.preventDefault();
+    const page = Number(pageInput);
+    if (!isNaN(page) && page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    } else {
+      setPageInput(currentPage.toString());
+    }
+  };
+
+  const getPageNumbers = () => {
+    const pages = [];
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
 
   const Wrapper = ({ children }) =>
     embedded ? <div>{children}</div> : <div className="container" style={{ padding: '32px 0' }}>{children}</div>;
@@ -676,7 +709,6 @@ export default function AdminProducts({ embedded = false }) {
         brands={brands}
       />
 
-      {/* FORMULÁRIO ISOLADO – NUNCA PERDE O FOCO */}
       <ProductForm
         editingProduct={editingProduct}
         categories={categories}
@@ -697,57 +729,124 @@ export default function AdminProducts({ embedded = false }) {
         {loading ? (
           <p style={{ color: 'var(--muted)' }}>A carregar...</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
-            <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 13 }}>
-                <th style={{ padding: 10 }}>ID</th>
-                <th style={{ padding: 10 }}>Imagem</th>
-                <th style={{ padding: 10 }}>Nome</th>
-                <th style={{ padding: 10 }}>Marca</th>
-                <th style={{ padding: 10 }}>Preço</th>
-                <th style={{ padding: 10 }}>Categoria</th>
-                <th style={{ padding: 10 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => {
-                const id = r.product_id ?? r.Product_id;
-                const imageUrl = r.imagem ? (r.imagem.startsWith('http') ? r.imagem : `${import.meta.env.VITE_API_URL}${r.imagem}`) : null;
-                return (
-                  <tr key={id} style={{ borderTop: '1px solid var(--border)' }}>
-                    <td style={{ padding: 10, fontWeight: 800 }}>#{id}</td>
-                    <td style={{ padding: 10 }}>
-                      <div
-                        style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', background: 'var(--surface-2)', border: '1px solid var(--border)', cursor: 'pointer' }}
-                        onClick={() => imageUrl && setModalImage(imageUrl)}
-                      >
-                        {imageUrl ? (
-                          <img 
-                            src={imageUrl}
-                            alt={r.nome} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          />
-                        ) : null}
-                      </div>
-                    </td>
-                    <td style={{ padding: 10 }}>{r.nome}</td>
-                    <td style={{ padding: 10 }}>{r.marca}</td>
-                    <td style={{ padding: 10, fontWeight: 800 }}>€{r.preco}</td>
-                    <td style={{ padding: 10 }}>{r.category_id}</td>
-                    <td style={{ padding: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <button className="btn btn-ghost" onClick={() => startEdit(r)}>Editar</button>
-                      <button className="btn btn-ghost" onClick={() => openDeleteConfirm(id, r.nome)} style={{ marginLeft: 8 }}>Apagar</button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={7} style={{ padding: 14, color: 'var(--muted)' }}>Sem produtos.</td>
+          <>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 13 }}>
+                  <th style={{ padding: 10 }}>ID</th>
+                  <th style={{ padding: 10 }}>Imagem</th>
+                  <th style={{ padding: 10 }}>Nome</th>
+                  <th style={{ padding: 10 }}>Marca</th>
+                  <th style={{ padding: 10 }}>Preço</th>
+                  <th style={{ padding: 10 }}>Categoria</th>
+                  <th style={{ padding: 10 }}></th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map(r => {
+                  const id = r.product_id ?? r.Product_id;
+                  const imageUrl = r.imagem ? (r.imagem.startsWith('http') ? r.imagem : `${import.meta.env.VITE_API_URL}${r.imagem}`) : null;
+                  return (
+                    <tr key={id} style={{ borderTop: '1px solid var(--border)' }}>
+                      <td style={{ padding: 10, fontWeight: 800 }}>#{id}</td>
+                      <td style={{ padding: 10 }}>
+                        <div
+                          style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', background: 'var(--surface-2)', border: '1px solid var(--border)', cursor: 'pointer' }}
+                          onClick={() => imageUrl && setModalImage(imageUrl)}
+                        >
+                          {imageUrl ? (
+                            <img 
+                              src={imageUrl}
+                              alt={r.nome} 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            />
+                          ) : null}
+                        </div>
+                      </td>
+                      <td style={{ padding: 10 }}>{r.nome}</td>
+                      <td style={{ padding: 10 }}>{r.marca}</td>
+                      <td style={{ padding: 10, fontWeight: 800 }}>€{r.preco}</td>
+                      <td style={{ padding: 10 }}>{r.category_id}</td>
+                      <td style={{ padding: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button className="btn btn-ghost" onClick={() => startEdit(r)}>Editar</button>
+                        <button className="btn btn-ghost" onClick={() => openDeleteConfirm(id, r.nome)} style={{ marginLeft: 8 }}>Apagar</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: 14, color: 'var(--muted)' }}>Sem produtos.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {/* Paginação Admin com input para saltar página */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="btn btn-ghost"
+                  style={{ padding: '0 16px' }}
+                >
+                  Anterior
+                </button>
+                {getPageNumbers().map(num => (
+                  <button
+                    key={num}
+                    onClick={() => handlePageChange(num)}
+                    className="btn"
+                    style={{
+                      padding: '0 14px',
+                      background: num === currentPage ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                      color: num === currentPage ? '#fff' : 'var(--text)',
+                      border: '1px solid ' + (num === currentPage ? 'transparent' : 'rgba(255,255,255,0.12)'),
+                      minWidth: '40px',
+                    }}
+                  >
+                    {num}
+                  </button>
+                ))}
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="btn btn-ghost"
+                  style={{ padding: '0 16px' }}
+                >
+                  Próximo
+                </button>
+
+                {/* Input para saltar página */}
+                <form onSubmit={handlePageInputSubmit} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                  <span style={{ fontSize: '14px', color: 'var(--muted)' }}>Ir para</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={pageInput}
+                    onChange={(e) => setPageInput(e.target.value)}
+                    style={{
+                      width: '60px',
+                      height: '36px',
+                      padding: '4px 6px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: 'var(--text)',
+                      textAlign: 'center',
+                      fontSize: '14px',
+                    }}
+                  />
+                  <span style={{ fontSize: '14px', color: 'var(--muted)' }}>de {totalPages}</span>
+                  <button type="submit" className="btn btn-ghost" style={{ padding: '0 12px', height: '36px' }}>
+                    Ir
+                  </button>
+                </form>
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -17,13 +17,13 @@ export default function Navbar() {
 
     const [loggedIn, setLoggedIn] = useState(isSessionValid());
     const userNome = useMemo(() => localStorage.getItem('user_nome') || '', [loggedIn]);
-    const userTipo = useMemo(() => localStorage.getItem('user_tipo') || '', [loggedIn]); // <-- ADICIONADO
+    const userTipo = useMemo(() => localStorage.getItem('user_tipo') || '', [loggedIn]);
 
     function logout() {
         localStorage.removeItem('user_id');
         localStorage.removeItem('user_nome');
         localStorage.removeItem('user_email');
-        localStorage.removeItem('user_tipo'); // <-- também remover o tipo
+        localStorage.removeItem('user_tipo');
         localStorage.removeItem('auth_expires_at');
 
         setLoggedIn(false);
@@ -48,61 +48,109 @@ export default function Navbar() {
     };
 
     return (
-        <header className="navbar">
-            <div className="container navbar-inner">
-                <Link to="/" className="navbar-logo" aria-label="Ir para a página inicial">
-                    <img src="/LogoStreetmarket.png" alt="StreetMarket" />
+        <header className="navbar" style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+            <div className="container navbar-inner" style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                gap: '16px',
+                padding: '14px 20px',   // Padding lateral para dar respiro
+                minHeight: '100px',
+                flexWrap: 'nowrap',
+                width: '100%',
+            }}>
+                {/* Logotipo – com margem esquerda para a centrar ligeiramente */}
+                <Link
+                    to="/"
+                    aria-label="Ir para a página inicial"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        textDecoration: 'none',
+                        flexShrink: 0,
+                        marginLeft: '8px',   // Pequeno deslocamento para a direita
+                    }}
+                >
+                    <img
+                        src="/LogoStreetmarket.png"
+                        alt="StreetMarket"
+                        style={{
+                            height: '90px',
+                            width: 'auto',
+                            display: 'block',
+                        }}
+                    />
                 </Link>
 
-                <nav className="navbar-links">
-                    <NavLink to="/" end className="btn btn-ghost">
+                {/* Grupo central: links de navegação e pesquisa/filtro */}
+                <nav className="navbar-links" style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px',
+                    flexWrap: 'nowrap',
+                    flex: '1 1 auto',
+                    justifyContent: 'center',
+                    minWidth: 0,
+                }}>
+                    <NavLink to="/" end className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                         Produtos
                     </NavLink>
 
-                    <NavLink to="/categories" className="btn btn-ghost">
+                    <NavLink to="/categories" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                         Categorias
                     </NavLink>
 
                     {loggedIn && (
                         <>
-                            <NavLink to="/notifications" className="btn btn-ghost">
+                            <NavLink to="/notifications" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                                 Notificações
                             </NavLink>
-                            <NavLink to="/orders" className="btn btn-ghost">
+                            <NavLink to="/orders" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                                 Encomendas
                             </NavLink>
                         </>
                     )}
 
-                    {/* ADMIN – visível apenas para Administradores */}
                     {loggedIn && userTipo === 'Administrador' && (
-                        <NavLink to="/admin" className="btn btn-ghost">
+                        <NavLink to="/admin" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                             Admin
                         </NavLink>
                     )}
 
-                    <button onClick={handleOpenSearch} className="btn btn-ghost" style={{ padding: '6px 12px' }}>
+                    <button onClick={handleOpenSearch} className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                         Pesquisar / Filtrar
                     </button>
+                </nav>
 
-                    {!loggedIn ? (
+                {/* Grupo da direita – com margem direita para centralizar o "Sair" */}
+                <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px',
+                    flexShrink: 0,
+                    flexWrap: 'nowrap',
+                    marginRight: '8px',   // Pequeno deslocamento para a esquerda
+                }}>
+                    {loggedIn ? (
                         <>
-                            <NavLink to="/login" className="btn btn-ghost">
-                                Login
-                            </NavLink>
-                            <NavLink to="/register" className="btn btn-primary">
-                                Registar
-                            </NavLink>
-                        </>
-                    ) : (
-                        <>
-                            <span className="navbar-user">Olá, {userNome || 'Utilizador'}</span>
-                            <button className="btn btn-ghost" onClick={logout}>
+                            <span className="navbar-user" style={{ whiteSpace: 'nowrap', fontSize: '16px' }}>
+                                Olá, {userNome || 'Utilizador'}
+                            </span>
+                            <button className="btn btn-ghost" onClick={logout} style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                                 Sair
                             </button>
                         </>
+                    ) : (
+                        <>
+                            <NavLink to="/login" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
+                                Login
+                            </NavLink>
+                            <NavLink to="/register" className="btn btn-primary" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
+                                Registar
+                            </NavLink>
+                        </>
                     )}
-                </nav>
+                </div>
             </div>
         </header>
     );

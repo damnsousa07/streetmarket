@@ -20,11 +20,11 @@ const faqData = [
   },
   {
     question: 'Posso devolver um produto?',
-    answer: 'Sim, tens 14 dias após a receção da encomenda para devolver o produto, desde que esteja nas mesmas condições e na embalagem original. Envia um email para streetmarket@email.com para iniciares o processo.',
+    answer: 'Sim, tens 14 dias após a receção da encomenda para devolver o produto, desde que esteja nas mesmas condições e na embalagem original. Envia um email para streetmarketptt@gmail.com para iniciares o processo.',
   },
   {
     question: 'Como entro em contacto convosco?',
-    answer: 'Podes enviar um email para streetmarket@email.com. Respondemos dentro de 24 horas úteis. (Não temos apoio ao cliente por telefone ou chat.)',
+    answer: 'Podes enviar um email para streetmarketptt@gmail.com. Respondemos dentro de 24 horas úteis. (Não temos apoio ao cliente por telefone ou chat.)',
   },
   {
     question: 'Esqueci-me da password, como recupero?',
@@ -116,8 +116,8 @@ export default function FAQ() {
       <div style={{ marginTop: '40px', textAlign: 'center', borderTop: '1px solid var(--border)', paddingTop: '24px' }}>
         <p style={{ color: 'var(--muted)', fontSize: '14px' }}>
           Não encontraste a resposta que procuravas? Envia-nos um email para{' '}
-          <a href="mailto:streetmarket@email.com" style={{ color: '#007bff', textDecoration: 'none', fontWeight: 600 }}>
-            streetmarket@email.com
+          <a href="mailto:streetmarketptt@gmail.com" style={{ color: '#007bff', textDecoration: 'none', fontWeight: 600 }}>
+            streetmarketptt@gmail.com
           </a>
         </p>
         <p style={{ color: 'var(--muted)', fontSize: '13px', marginTop: '4px' }}>

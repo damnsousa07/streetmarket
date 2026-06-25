@@ -6,6 +6,7 @@ const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ========== CONFIGURAÇÃO DO UPLOAD (passo 2.3) ==========
 // Garantir que a pasta uploads existe

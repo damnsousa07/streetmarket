@@ -1,6 +1,5 @@
 // AdminCategories.jsx
-// Página de administração de categorias (CRUD completo).
-// Permite criar, editar, apagar e pesquisar categorias com confirmações modais.
+// Página de administração de categorias (CRUD completo) com imagens.
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
@@ -10,43 +9,33 @@ import {
     deleteAdminCategory,
 } from '../../api/admin';
 
-// ------------------------------------------------------------
-// Verifica se existe uma chave de administrador no localStorage
 function requireAdminKey() {
     const key = localStorage.getItem('admin_key');
     return !!key && key.trim().length > 0;
 }
 
-// Estado inicial do formulário (vazio)
-const emptyForm = { nome: '', descricao: '' };
+const emptyForm = { nome: '', descricao: '', image: null, imagePreview: '' };
 
-// Opções de ordenação disponíveis
 const SORT_OPTIONS = [
     { value: 'name_asc', label: 'Nome: A → Z' },
     { value: 'name_desc', label: 'Nome: Z → A' },
 ];
 
 // ------------------------------------------------------------
-// Componente de barra de pesquisa (isolado para evitar re-renders desnecessários)
-// Inclui campo de texto (com debounce) e seletor de ordenação
+// Barra de pesquisa
 const SearchBar = ({ onSearch, onSortChange, sortValue }) => {
-    // Estado local do termo de pesquisa
     const [localSearch, setLocalSearch] = useState('');
-    // Referência para o timer do debounce
     const debounceTimer = useRef(null);
 
-    // Quando o utilizador escreve, aplica debounce de 500ms antes de chamar o callback
     const handleSearchChange = (e) => {
         const value = e.target.value;
         setLocalSearch(value);
-        // Limpa o timer anterior para evitar chamadas desnecessárias
         if (debounceTimer.current) clearTimeout(debounceTimer.current);
         debounceTimer.current = setTimeout(() => {
             onSearch(value);
         }, 500);
     };
 
-    // Quando a ordenação muda, chama o callback imediatamente
     const handleSortChange = (e) => {
         onSortChange(e.target.value);
     };
@@ -76,88 +65,69 @@ const SearchBar = ({ onSearch, onSortChange, sortValue }) => {
 };
 
 // ------------------------------------------------------------
-// Componente principal de gestão de categorias (admin)
+// Componente principal
 export default function AdminCategories() {
-    // Estados para a lista de categorias, carregamento e erro
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [sort, setSort] = useState('name_asc');
 
-    // Estados para o formulário de criação
+    // Formulário de criação
     const [form, setForm] = useState(emptyForm);
     const [creating, setCreating] = useState(false);
 
-    // Estados para o formulário de edição (inline)
+    // Formulário de edição (inline)
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState(emptyForm);
     const [savingEdit, setSavingEdit] = useState(false);
 
-    // Modal de sucesso (criação/edição/eliminação)
+    // Modais
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [successDetail, setSuccessDetail] = useState('');
 
-    // Modal de confirmação de eliminação
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteTargetId, setDeleteTargetId] = useState(null);
     const [deleteTargetName, setDeleteTargetName] = useState('');
 
-    // Modal de confirmação de edição (antes de guardar)
     const [showConfirmEditModal, setShowConfirmEditModal] = useState(false);
     const [editConfirmData, setEditConfirmData] = useState({ id: null, nome: '' });
 
-    // Verifica se a chave de administrador está definida
     const hasKey = useMemo(() => requireAdminKey(), []);
 
     // ------------------------------------------------------------
-    // Função que carrega as categorias com os filtros atuais (search + sort)
     const load = useCallback(async () => {
-        // Se não houver chave, mostra erro e interrompe
         if (!requireAdminKey()) {
             setError('Sem admin key. Vai a /admin/login e define a chave.');
             setLoading(false);
             return;
         }
-
         try {
             setLoading(true);
             setError('');
-            // Constrói a query string com os parâmetros de pesquisa e ordenação
             const params = new URLSearchParams();
             if (searchTerm) params.append('search', searchTerm);
             if (sort) params.append('sort', sort);
             const data = await getAdminCategories(params.toString());
             setRows(Array.isArray(data) ? data : []);
         } catch (e) {
-            // Extrai detalhes do erro para mostrar ao utilizador
             const status = e?.response?.status;
             const msg = e?.response?.data?.message;
-            setError(
-                `Não foi possível carregar categorias. ${status ? `(HTTP ${status})` : ''} ${msg ? `- ${msg}` : ''}`
-            );
+            setError(`Não foi possível carregar categorias. ${status ? `(HTTP ${status})` : ''} ${msg ? `- ${msg}` : ''}`);
         } finally {
             setLoading(false);
         }
     }, [searchTerm, sort]);
 
-    // Recarrega sempre que os filtros mudarem (search ou sort)
     useEffect(() => {
         load();
     }, [load]);
 
-    // Handlers para atualizar o termo de pesquisa e a ordenação
-    const handleSearch = useCallback((term) => {
-        setSearchTerm(term);
-    }, []);
-
-    const handleSortChange = useCallback((newSort) => {
-        setSort(newSort);
-    }, []);
+    const handleSearch = useCallback((term) => setSearchTerm(term), []);
+    const handleSortChange = useCallback((newSort) => setSort(newSort), []);
 
     // ------------------------------------------------------------
-    // Função helper para atualizar estados de formulário (criação/edição)
     function onChange(setter) {
         return (e) => {
             const { name, value } = e.target;
@@ -165,26 +135,38 @@ export default function AdminCategories() {
         };
     }
 
-    // Validação básica: nome não pode ser vazio
+    function onImageChange(setter) {
+        return (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setter((prev) => ({
+                    ...prev,
+                    image: file,
+                    imagePreview: reader.result,
+                }));
+            };
+            reader.readAsDataURL(file);
+        };
+    }
+
     function validateCategory(p) {
         if (!p.nome || !p.nome.trim()) return 'Nome é obrigatório.';
         return '';
     }
 
     // ------------------------------------------------------------
-    // Funções para o modal de sucesso
     const showSuccess = (message, detail = '') => {
         setSuccessMessage(message);
         setSuccessDetail(detail);
         setShowSuccessModal(true);
     };
 
-    const closeSuccessModal = () => {
-        setShowSuccessModal(false);
-    };
+    const closeSuccessModal = () => setShowSuccessModal(false);
 
     // ------------------------------------------------------------
-    // Funções para o modal de eliminação
+    // ELIMINAÇÃO
     const openDeleteConfirm = (id, nome) => {
         setDeleteTargetId(id);
         setDeleteTargetName(nome || '');
@@ -193,18 +175,17 @@ export default function AdminCategories() {
 
     const confirmDelete = async () => {
         const id = deleteTargetId;
-        setShowDeleteModal(false); // Fecha o modal
+        setShowDeleteModal(false);
         try {
             setError('');
-            await deleteAdminCategory(id); // Chama a API para eliminar
-            await load(); // Recarrega a lista
+            await deleteAdminCategory(id);
+            await load();
             showSuccess('Categoria apagada com sucesso!', `ID: #${id}`);
         } catch (e) {
             const status = e?.response?.status;
             const m = e?.response?.data?.message;
             setError(`Falha ao apagar categoria. ${status ? `(HTTP ${status})` : ''} ${m ? `- ${m}` : ''}`);
         } finally {
-            // Limpa os dados do alvo
             setDeleteTargetId(null);
             setDeleteTargetName('');
         }
@@ -217,30 +198,29 @@ export default function AdminCategories() {
     };
 
     // ------------------------------------------------------------
-    // Criação de nova categoria
+    // CRIAÇÃO
     async function handleCreate(e) {
         e.preventDefault();
-
-        // Valida o nome
         const msg = validateCategory(form);
         if (msg) {
             setError(msg);
             return;
         }
 
-        // Prepara o payload
-        const payload = {
-            nome: form.nome.trim(),
-            descricao: form.descricao.trim() || null,
-        };
+        const formData = new FormData();
+        formData.append('nome', form.nome.trim());
+        formData.append('descricao', form.descricao.trim() || '');
+        if (form.image) {
+            formData.append('image', form.image);
+        }
 
         try {
             setCreating(true);
             setError('');
-            await createAdminCategory(payload); // Chama a API
-            setForm(emptyForm); // Limpa o formulário
-            await load(); // Recarrega a lista
-            showSuccess('Categoria criada com sucesso!', `Nome: ${payload.nome}`);
+            await createAdminCategory(formData);
+            setForm(emptyForm);
+            await load();
+            showSuccess('Categoria criada com sucesso!', `Nome: ${form.nome.trim()}`);
         } catch (e) {
             const status = e?.response?.status;
             const m = e?.response?.data?.message;
@@ -251,34 +231,39 @@ export default function AdminCategories() {
     }
 
     // ------------------------------------------------------------
-    // Edição de categoria (inline)
-    // Inicia o modo de edição para uma linha específica
+    // EDIÇÃO
     function startEdit(row) {
         setEditingId(row.category_id);
         setEditForm({
             nome: row.nome ?? '',
             descricao: row.descricao ?? '',
+            image: null,
+            imagePreview: row.image_url ? `${import.meta.env.VITE_API_URL}${row.image_url}` : '',
         });
     }
 
-    // Cancela o modo de edição
     function cancelEdit() {
         setEditingId(null);
         setEditForm(emptyForm);
         setSavingEdit(false);
     }
 
-    // Abre o modal de confirmação antes de guardar a edição
+    // Abre o modal de confirmação com os dados atuais
     const openConfirmEdit = (id, nome) => {
         setEditConfirmData({ id, nome });
         setShowConfirmEditModal(true);
     };
 
-    // Confirma a edição (chamado pelo modal)
+    // Confirmar edição – chama a função que guarda
     const confirmEdit = async () => {
         const id = editConfirmData.id;
         setShowConfirmEditModal(false);
-        await performSaveEdit(id);
+        if (id) {
+            await performSaveEdit(id);
+        } else {
+            setError('ID da categoria inválido.');
+        }
+        setEditConfirmData({ id: null, nome: '' });
     };
 
     // Cancela a edição a partir do modal
@@ -287,27 +272,39 @@ export default function AdminCategories() {
         setEditConfirmData({ id: null, nome: '' });
     };
 
-    // Função que efetivamente guarda a edição (chamada após confirmação)
+    // Função que efetivamente guarda a edição
     const performSaveEdit = async (id) => {
-        // Valida o nome
         const msg = validateCategory(editForm);
         if (msg) {
             setError(msg);
             return;
         }
 
-        const payload = {
-            nome: editForm.nome.trim(),
-            descricao: editForm.descricao.trim() || null,
-        };
+        const formData = new FormData();
+        formData.append('nome', editForm.nome.trim());
+        formData.append('descricao', editForm.descricao.trim() || '');
+        if (editForm.image) {
+            formData.append('image', editForm.image);
+        }
+
+        console.log('🔵 A enviar edição para ID:', id);
+        const formDataEntries = {};
+        for (let [key, value] of formData.entries()) {
+            if (key === 'image' && value instanceof File) {
+                formDataEntries[key] = `File: ${value.name} (${value.size} bytes)`;
+            } else {
+                formDataEntries[key] = value;
+            }
+        }
+        console.log('🔵 FormData:', formDataEntries);
 
         try {
             setSavingEdit(true);
             setError('');
-            await updateAdminCategory(id, payload); // Chama a API
-            await load(); // Recarrega a lista
-            showSuccess('Categoria atualizada com sucesso!', `Nome: ${payload.nome}`);
-            cancelEdit(); // Sai do modo de edição
+            await updateAdminCategory(id, formData);
+            await load();
+            showSuccess('Categoria atualizada com sucesso!', `Nome: ${editForm.nome.trim()}`);
+            cancelEdit();
         } catch (e) {
             const status = e?.response?.status;
             const m = e?.response?.data?.message;
@@ -317,13 +314,11 @@ export default function AdminCategories() {
         }
     };
 
-    // Handler do botão "Guardar" na linha de edição (abre o modal)
     const handleSaveEditClick = (id, nome) => {
         openConfirmEdit(id, nome);
     };
 
     // ------------------------------------------------------------
-    // Renderização condicional: se não houver chave, mostra aviso
     if (!hasKey) {
         return (
             <div className="container" style={{ padding: '32px 0' }}>
@@ -335,34 +330,49 @@ export default function AdminCategories() {
         );
     }
 
-    // ------------------------------------------------------------
-    // Renderização principal
+    // Função segura para tratar erro de imagem
+    const handleImageError = (e) => {
+        const img = e.currentTarget;
+        // Verifica se o elemento ainda está no DOM e tem pai
+        if (img && img.parentNode) {
+            // Substitui a imagem por um ícone 📁
+            const parent = img.parentNode;
+            // Remove a imagem
+            img.style.display = 'none';
+            // Adiciona um span com o ícone
+            const icon = document.createElement('span');
+            icon.textContent = '📁';
+            icon.style.fontSize = '28px';
+            icon.style.display = 'flex';
+            icon.style.alignItems = 'center';
+            icon.style.justifyContent = 'center';
+            icon.style.width = '100%';
+            icon.style.height = '100%';
+            parent.appendChild(icon);
+        }
+    };
+
     return (
         <div className="container" style={{ padding: '32px 0' }}>
-            {/* Cabeçalho */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                     <h1 style={{ margin: 0 }}>Admin • Categorias</h1>
-                    <p style={{ color: 'var(--muted)', marginTop: 6 }}>Criar, editar e apagar categorias.</p>
+                    <p style={{ color: 'var(--muted)', marginTop: 6 }}>Criar, editar e apagar categorias com imagem.</p>
                 </div>
-                <div>
-                    <button className="btn btn-primary" onClick={load} disabled={loading}>
-                        Atualizar
-                    </button>
-                </div>
+                <button className="btn btn-primary" onClick={load} disabled={loading}>
+                    Atualizar
+                </button>
             </div>
 
-            {/* Barra de pesquisa e ordenação */}
             <SearchBar
                 onSearch={handleSearch}
                 onSortChange={handleSortChange}
                 sortValue={sort}
             />
 
-            {/* Mensagem de erro geral */}
             {error && <p style={{ color: 'salmon', marginTop: 16 }}>{error}</p>}
 
-            {/* Formulário de criação de categoria */}
+            {/* Formulário de criação */}
             <div className="card" style={{ padding: 14, marginTop: 16 }}>
                 <div style={{ fontWeight: 900, marginBottom: 10 }}>Criar categoria</div>
                 <form onSubmit={handleCreate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -374,6 +384,15 @@ export default function AdminCategories() {
                         <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Descrição</label>
                         <input className="input" name="descricao" value={form.descricao} onChange={onChange(setForm)} />
                     </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Imagem (opcional)</label>
+                        <input type="file" accept="image/*" onChange={onImageChange(setForm)} className="input" />
+                        {form.imagePreview && (
+                            <div style={{ marginTop: 8 }}>
+                                <img src={form.imagePreview} alt="Pré-visualização" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
+                            </div>
+                        )}
+                    </div>
                     <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
                         <button className="btn btn-primary" type="submit" disabled={creating}>
                             {creating ? 'A criar...' : 'Criar'}
@@ -382,7 +401,7 @@ export default function AdminCategories() {
                 </form>
             </div>
 
-            {/* Lista de categorias (tabela) */}
+            {/* Lista de categorias */}
             <div className="card" style={{ padding: 12, marginTop: 16, overflowX: 'auto' }}>
                 {loading ? (
                     <p style={{ color: 'var(--muted)' }}>A carregar...</p>
@@ -392,7 +411,7 @@ export default function AdminCategories() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
                         <thead>
                             <tr style={{ textAlign: 'left', color: 'var(--muted)', fontSize: 13 }}>
-                                <th style={{ padding: 10 }}>ID</th>
+                                <th style={{ padding: 10, width: '80px' }}>Imagem</th>
                                 <th style={{ padding: 10 }}>Nome</th>
                                 <th style={{ padding: 10 }}>Descrição</th>
                                 <th style={{ padding: 10 }}></th>
@@ -403,7 +422,53 @@ export default function AdminCategories() {
                                 const isEditing = editingId === r.category_id;
                                 return (
                                     <tr key={r.category_id} style={{ borderTop: '1px solid var(--border)' }}>
-                                        <td style={{ padding: 10, fontWeight: 800 }}>#{r.category_id}</td>
+                                        <td style={{ padding: 10 }}>
+                                            {isEditing ? (
+                                                <>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={onImageChange(setEditForm)}
+                                                        className="input"
+                                                        style={{ width: 120 }}
+                                                    />
+                                                    {editForm.imagePreview && (
+                                                        <div style={{ marginTop: 4 }}>
+                                                            <img
+                                                                src={editForm.imagePreview}
+                                                                alt="prévia"
+                                                                style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div
+                                                    style={{
+                                                        width: 56,
+                                                        height: 56,
+                                                        borderRadius: 12,
+                                                        overflow: 'hidden',
+                                                        background: 'var(--surface-2)',
+                                                        border: '1px solid var(--border)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                    }}
+                                                >
+                                                    {r.image_url ? (
+                                                        <img
+                                                            src={`${import.meta.env.VITE_API_URL}${r.image_url}`}
+                                                            alt={r.nome}
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                            onError={handleImageError}
+                                                        />
+                                                    ) : (
+                                                        <span style={{ fontSize: 28 }}>📁</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td style={{ padding: 10 }}>
                                             {isEditing ? (
                                                 <input className="input" name="nome" value={editForm.nome} onChange={onChange(setEditForm)} />
@@ -441,7 +506,7 @@ export default function AdminCategories() {
                 )}
             </div>
 
-            {/* Modal de sucesso (criação/edição/eliminação) */}
+            {/* Modais */}
             {showSuccessModal && (
                 <div
                     style={{
@@ -493,7 +558,6 @@ export default function AdminCategories() {
                 </div>
             )}
 
-            {/* Modal de confirmação de eliminação */}
             {showDeleteModal && (
                 <div
                     style={{
@@ -529,42 +593,13 @@ export default function AdminCategories() {
                             Tem a certeza que deseja eliminar a categoria <strong>“{deleteTargetName}”</strong> (#{deleteTargetId})?
                         </p>
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                            <button
-                                onClick={cancelDelete}
-                                style={{
-                                    background: '#e0e0e0',
-                                    color: '#333',
-                                    border: 'none',
-                                    borderRadius: '40px',
-                                    padding: '10px 24px',
-                                    fontSize: '14px',
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmDelete}
-                                style={{
-                                    background: '#ff4444',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '40px',
-                                    padding: '10px 24px',
-                                    fontSize: '14px',
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Eliminar
-                            </button>
+                            <button onClick={cancelDelete} style={{ background: '#e0e0e0', color: '#333', border: 'none', borderRadius: '40px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
+                            <button onClick={confirmDelete} style={{ background: '#ff4444', color: '#fff', border: 'none', borderRadius: '40px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontWeight: 600 }}>Eliminar</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Modal de confirmação de edição */}
             {showConfirmEditModal && (
                 <div
                     style={{
@@ -600,36 +635,8 @@ export default function AdminCategories() {
                             Deseja salvar as alterações na categoria <strong>“{editConfirmData.nome}”</strong>?
                         </p>
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                            <button
-                                onClick={cancelConfirmEdit}
-                                style={{
-                                    background: '#e0e0e0',
-                                    color: '#333',
-                                    border: 'none',
-                                    borderRadius: '40px',
-                                    padding: '10px 24px',
-                                    fontSize: '14px',
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={confirmEdit}
-                                style={{
-                                    background: '#646cff',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: '40px',
-                                    padding: '10px 24px',
-                                    fontSize: '14px',
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                }}
-                            >
-                                Confirmar
-                            </button>
+                            <button onClick={cancelConfirmEdit} style={{ background: '#e0e0e0', color: '#333', border: 'none', borderRadius: '40px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontWeight: 600 }}>Cancelar</button>
+                            <button onClick={confirmEdit} style={{ background: '#646cff', color: '#fff', border: 'none', borderRadius: '40px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer', fontWeight: 600 }}>Confirmar</button>
                         </div>
                     </div>
                 </div>

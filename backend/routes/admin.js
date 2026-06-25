@@ -6,14 +6,29 @@ const fs = require('fs');
 const db = require('../db');
 const { sendReviewRequestEmail } = require('../services/emailservice');
 
+// ============================================================
+// CONFIGURAÇÃO DO UPLOAD (UNIFICADO)
+// ============================================================
+
 const uploadDir = path.join(__dirname, '../uploads');
+const categoriesDir = path.join(uploadDir, 'categories');
+
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+if (!fs.existsSync(categoriesDir)) fs.mkdirSync(categoriesDir, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
+  destination: (req, file, cb) => {
+    if (req.path.includes('/Categories')) {
+      cb(null, categoriesDir);
+    } else {
+      cb(null, uploadDir);
+    }
+  },
   filename: (req, file, cb) => {
     const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `prod-${unique}${path.extname(file.originalname)}`);
+    const ext = path.extname(file.originalname);
+    const prefix = req.path.includes('/Categories') ? 'cat-' : 'prod-';
+    cb(null, `${prefix}${unique}${ext}`);
   }
 });
 
@@ -21,6 +36,10 @@ const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }
 });
+
+// ============================================================
+// MIDDLEWARE DE ADMIN
+// ============================================================
 
 function requireAdmin(req, res, next) {
   const key = req.headers['x-admin-key'];
@@ -35,7 +54,10 @@ function requireAdmin(req, res, next) {
 
 router.use(requireAdmin);
 
-// ===== CATEGORIAS =====
+// ============================================================
+// ROTAS DE CATEGORIAS (com imagem)
+// ============================================================
+
 router.get('/Categories', async (req, res) => {
   const search = req.query.search ? `%${req.query.search}%` : null;
   const sort = req.query.sort === 'name_desc' ? 'DESC' : 'ASC';
@@ -55,31 +77,76 @@ router.get('/Categories', async (req, res) => {
   }
 });
 
-router.post('/Categories', async (req, res) => {
+router.post('/Categories', upload.single('image'), async (req, res) => {
+  console.log('🔍 req.file:', req.file);
+  console.log('🔍 req.body:', req.body);
+
+  req.body = req.body || {};
   const { nome, descricao } = req.body;
   if (!nome) return res.status(400).json({ message: 'Nome é obrigatório.' });
+
+  let imageUrl = null;
+  if (req.file) {
+    // O multer já guardou com o prefixo cat-
+    imageUrl = `/uploads/categories/${req.file.filename}`;
+    console.log('✅ Ficheiro guardado:', imageUrl);
+  } else {
+    console.log('❌ Nenhum ficheiro recebido.');
+  }
+
   try {
     const [result] = await db.promise().query(
-      'INSERT INTO Categories (nome, descricao) VALUES (?, ?)',
-      [nome, descricao || null]
+      'INSERT INTO Categories (nome, descricao, image_url) VALUES (?, ?, ?)',
+      [nome, descricao || null, imageUrl]
     );
-    res.status(201).json({ message: 'Categoria criada.', category_id: result.insertId });
+    res.status(201).json({
+      message: 'Categoria criada.',
+      category_id: result.insertId,
+      image_url: imageUrl,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao criar categoria.' });
   }
 });
 
-router.put('/Categories/:id', async (req, res) => {
+router.put('/Categories/:id', upload.single('image'), async (req, res) => {
+  req.body = req.body || {};
   const { id } = req.params;
   const { nome, descricao } = req.body;
   if (!nome) return res.status(400).json({ message: 'Nome é obrigatório.' });
+
+  let imageUrl = null;
+  if (req.file) {
+    imageUrl = `/uploads/categories/${req.file.filename}`;
+    console.log('✅ Nova imagem guardada:', imageUrl);
+
+    // Apagar a imagem antiga
+    const [old] = await db.promise().query('SELECT image_url FROM Categories WHERE category_id = ?', [id]);
+    if (old.length > 0 && old[0].image_url) {
+      const oldPath = path.join(__dirname, '..', old[0].image_url);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+        console.log('🗑️ Imagem antiga apagada:', oldPath);
+      }
+    }
+  }
+
   try {
-    const [result] = await db.promise().query(
-      'UPDATE Categories SET nome = ?, descricao = ? WHERE category_id = ?',
-      [nome, descricao || null, id]
-    );
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Categoria não encontrada.' });
+    let sql = 'UPDATE Categories SET nome = ?, descricao = ?';
+    const params = [nome, descricao || null];
+    if (imageUrl) {
+      sql += ', image_url = ?';
+      params.push(imageUrl);
+    }
+    sql += ' WHERE category_id = ?';
+    params.push(id);
+
+    const [result] = await db.promise().query(sql, params);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Categoria não encontrada.' });
+    }
+
     res.json({ message: 'Categoria atualizada.' });
   } catch (err) {
     console.error(err);
@@ -97,8 +164,21 @@ router.delete('/Categories/:id', async (req, res) => {
     if (check[0].total > 0) {
       return res.status(400).json({ message: 'Não é possível apagar: existem produtos associados.' });
     }
+
+    const [old] = await db.promise().query('SELECT image_url FROM Categories WHERE category_id = ?', [id]);
     const [result] = await db.promise().query('DELETE FROM Categories WHERE category_id = ?', [id]);
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Categoria não encontrada.' });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Categoria não encontrada.' });
+    }
+
+    if (old.length > 0 && old[0].image_url) {
+      const oldPath = path.join(__dirname, '..', old[0].image_url);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+        console.log('🗑️ Imagem apagada:', oldPath);
+      }
+    }
+
     res.json({ message: 'Categoria apagada.' });
   } catch (err) {
     console.error(err);
@@ -106,8 +186,15 @@ router.delete('/Categories/:id', async (req, res) => {
   }
 });
 
-// ===== PRODUTOS =====
+// ============================================================
+// ROTAS DE PRODUTOS (paginação, CRUD, etc.)
+// ============================================================
+
 router.get('/Products', async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 12;
+  const offset = (page - 1) * limit;
+
   const search = req.query.search ? `%${req.query.search}%` : null;
   const category_id = req.query.category_id ? parseInt(req.query.category_id) : null;
   const brand = req.query.brand || null;
@@ -122,6 +209,7 @@ router.get('/Products', async (req, res) => {
     WHERE 1=1
   `;
   const params = [];
+
   if (search) {
     sql += ` AND (p.nome LIKE ? OR p.marca LIKE ?)`;
     params.push(search, search);
@@ -151,21 +239,35 @@ router.get('/Products', async (req, res) => {
     default: sql += ` ORDER BY p.product_id DESC`;
   }
 
-  try {
-    const [rows] = await db.promise().query(sql, params);
-    const imagePromises = rows.map(async (product) => {
-      const [images] = await db.promise().query(
-        'SELECT image_url FROM ProductsImages WHERE product_id = ? ORDER BY order_index ASC, is_primary DESC, created_at ASC LIMIT 1',
-        [product.product_id]
-      );
-      product.imagem = images[0]?.image_url || null;
-    });
-    await Promise.all(imagePromises);
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Erro ao listar produtos.' });
-  }
+  const countSql = sql.replace(/ORDER BY.*$/, '');
+  const [countResult] = await db.promise().query(countSql, params);
+  const total = countResult.length;
+
+  sql += ` LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
+
+  const [rows] = await db.promise().query(sql, params);
+
+  const imagePromises = rows.map(async (product) => {
+    const [images] = await db.promise().query(
+      'SELECT image_url FROM ProductsImages WHERE product_id = ? ORDER BY order_index ASC, is_primary DESC, created_at ASC LIMIT 1',
+      [product.product_id]
+    );
+    product.imagem = images[0]?.image_url || null;
+  });
+  await Promise.all(imagePromises);
+
+  const totalPages = Math.ceil(total / limit);
+
+  res.json({
+    data: rows,
+    meta: {
+      total,
+      totalPages,
+      currentPage: page,
+      limit,
+    }
+  });
 });
 
 router.get('/Products/:id', async (req, res) => {
@@ -224,7 +326,7 @@ router.post('/Products', upload.array('images', 6), async (req, res) => {
     await connection.beginTransaction();
 
     const [result] = await connection.query(
-      'INSERT INTO Products (nome, marca, preco, descricao, category_id, tamanhos, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+      'INSERT INTO Products (nome, marca, preco, descricao, category_id, tamanhos, data_criacao) VALUES (?, ?, ?, ?, ?, ?, NOW())',
       [nome, marca, preco, descricao || null, category_id, tamanhos || null]
     );
     const productId = result.insertId;
@@ -262,10 +364,8 @@ router.post('/Products', upload.array('images', 6), async (req, res) => {
   }
 });
 
-// ===== PUT /Products/:id (CORRIGIDO - usa updated_at) =====
 router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
   const { id } = req.params;
-  console.log('🚀 NOVO CÓDIGO ADMIN A CORRER!');
   console.log('PUT /admin/Products/:id - req.body:', req.body);
   console.log('PUT /admin/Products/:id - req.files:', req.files ? req.files.length : 0);
 
@@ -282,10 +382,9 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. ATUALIZA OS DADOS DO PRODUTO + updated_at = NOW()
     console.log('A atualizar produto com:', { nome, marca, preco, descricao, category_id, tamanhos, id });
     const [updateResult] = await connection.query(
-      'UPDATE Products SET nome = ?, marca = ?, preco = ?, descricao = ?, category_id = ?, tamanhos = ?, updated_at = NOW() WHERE product_id = ?',
+      'UPDATE Products SET nome = ?, marca = ?, preco = ?, descricao = ?, category_id = ?, tamanhos = ? WHERE product_id = ?',
       [nome, marca, preco, descricao || null, category_id, tamanhos || null, id]
     );
     console.log('Resultado do update:', updateResult);
@@ -294,7 +393,6 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
 
-    // 2. DELETE imagens
     let imagesToDelete = req.body.imagesToDelete;
     if (imagesToDelete && typeof imagesToDelete === 'string') {
       try { imagesToDelete = JSON.parse(imagesToDelete); } catch (e) { imagesToDelete = []; }
@@ -307,7 +405,6 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       console.log(`Imagens eliminadas: ${imagesToDelete.join(', ')}`);
     }
 
-    // 3. REORDENAÇÃO
     let imagesOrder = req.body.imagesOrder;
     if (imagesOrder && typeof imagesOrder === 'string') {
       try { imagesOrder = JSON.parse(imagesOrder); } catch (e) { imagesOrder = []; }
@@ -333,7 +430,6 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       }
     }
 
-    // 4. ADICIONAR NOVAS IMAGENS
     if (req.files && req.files.length) {
       const [maxOrder] = await connection.query(
         'SELECT COALESCE(MAX(order_index), -1) AS maxIdx FROM ProductsImages WHERE product_id = ?',
@@ -356,7 +452,6 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       console.log(`Novas imagens adicionadas: ${req.files.length}`);
     }
 
-    // 5. ATUALIZA CAMPO imagem
     await connection.query(
       `UPDATE Products 
        SET imagem = (
@@ -379,7 +474,6 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
   }
 });
 
-// ===== DELETE =====
 router.delete('/Products/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -392,7 +486,10 @@ router.delete('/Products/:id', async (req, res) => {
   }
 });
 
-// ===== ENCOMENDAS =====
+// ============================================================
+// ROTAS DE ENCOMENDAS
+// ============================================================
+
 router.get('/Orders', async (req, res) => {
   const search = req.query.search ? `%${req.query.search}%` : null;
   const status_id = req.query.status_id ? parseInt(req.query.status_id) : null;
@@ -502,7 +599,10 @@ router.put('/Orders/:order_id/status', async (req, res) => {
   }
 });
 
-// ===== NOTIFICAÇÕES =====
+// ============================================================
+// ROTAS DE NOTIFICAÇÕES
+// ============================================================
+
 router.get('/Notifications', async (req, res) => {
   const search = req.query.search ? `%${req.query.search}%` : null;
   const type = req.query.type || null;

@@ -21,9 +21,69 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
+// ========================
+// GET /products – com paginação e filtros
+// ========================
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await db.promise().query('SELECT * FROM Products');
+    // Paginação
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const offset = (page - 1) * limit;
+
+    // Filtros
+    const search = req.query.q ? `%${req.query.q}%` : null;
+    const category_id = req.query.category_id ? parseInt(req.query.category_id) : null;
+    const brand = req.query.brand || null;
+    const min_price = req.query.min_price ? parseFloat(req.query.min_price) : null;
+    const max_price = req.query.max_price ? parseFloat(req.query.max_price) : null;
+    const sort = req.query.sort || 'id_desc';
+
+    let sql = 'SELECT * FROM Products WHERE 1=1';
+    const params = [];
+
+    if (search) {
+      sql += ' AND (nome LIKE ? OR marca LIKE ?)';
+      params.push(search, search);
+    }
+    if (category_id !== null) {
+      sql += ' AND category_id = ?';
+      params.push(category_id);
+    }
+    if (brand) {
+      sql += ' AND marca = ?';
+      params.push(brand);
+    }
+    if (min_price !== null) {
+      sql += ' AND preco >= ?';
+      params.push(min_price);
+    }
+    if (max_price !== null) {
+      sql += ' AND preco <= ?';
+      params.push(max_price);
+    }
+
+    // Ordenação
+    switch (sort) {
+      case 'name_asc': sql += ' ORDER BY nome ASC'; break;
+      case 'name_desc': sql += ' ORDER BY nome DESC'; break;
+      case 'price_asc': sql += ' ORDER BY preco ASC'; break;
+      case 'price_desc': sql += ' ORDER BY preco DESC'; break;
+      default: sql += ' ORDER BY product_id DESC';
+    }
+
+    // Contagem total (sem LIMIT)
+    const countSql = sql.replace(/ORDER BY.*$/, '');
+    const [countResult] = await db.promise().query(countSql, params);
+    const total = countResult.length;
+
+    // Aplicar LIMIT e OFFSET
+    sql += ` LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    const [rows] = await db.promise().query(sql, params);
+
+    // Buscar imagem principal
     for (let product of rows) {
       const [images] = await db.promise().query(
         'SELECT image_url FROM ProductsImages WHERE product_id = ? ORDER BY order_index ASC, is_primary DESC, created_at ASC LIMIT 1',
@@ -31,68 +91,37 @@ router.get('/', async (req, res) => {
       );
       product.imagem = images[0]?.image_url || null;
     }
-    res.json(rows);
+
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({
+      data: rows,
+      meta: {
+        total,
+        totalPages,
+        currentPage: page,
+        limit,
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao obter produtos' });
   }
 });
 
+// ========================
+// GET /products/search – redireciona para a rota principal com filtros (mantido para compatibilidade)
+// ========================
 router.get('/search', async (req, res) => {
-  let { q, category_id, min_price, max_price, sort } = req.query;
-  if (min_price === '') min_price = undefined;
-  if (max_price === '') max_price = undefined;
-
-  let sql = 'SELECT * FROM Products WHERE 1=1';
-  const params = [];
-
-  if (q && q.trim() !== '') {
-    sql += ' AND (nome LIKE ? OR marca LIKE ?)';
-    params.push(`%${q}%`, `%${q}%`);
-  }
-  if (category_id && category_id !== '') {
-    sql += ' AND category_id = ?';
-    params.push(category_id);
-  }
-  if (min_price !== undefined) {
-    const min = Number(min_price);
-    if (!isNaN(min)) {
-      sql += ' AND preco >= ?';
-      params.push(min);
-    }
-  }
-  if (max_price !== undefined) {
-    const max = Number(max_price);
-    if (!isNaN(max)) {
-      sql += ' AND preco <= ?';
-      params.push(max);
-    }
-  }
-
-  switch (sort) {
-    case 'price_asc': sql += ' ORDER BY preco ASC'; break;
-    case 'price_desc': sql += ' ORDER BY preco DESC'; break;
-    case 'name_asc': sql += ' ORDER BY nome ASC'; break;
-    case 'name_desc': sql += ' ORDER BY nome DESC'; break;
-    default: sql += ' ORDER BY product_id DESC';
-  }
-
-  try {
-    const [rows] = await db.promise().query(sql, params);
-    for (let product of rows) {
-      const [images] = await db.promise().query(
-        'SELECT image_url FROM ProductsImages WHERE product_id = ? ORDER BY order_index ASC, is_primary DESC, created_at ASC LIMIT 1',
-        [product.product_id]
-      );
-      product.imagem = images[0]?.image_url || null;
-    }
-    res.json(rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Erro na pesquisa' });
-  }
+  // Redirecionar para a rota principal com os mesmos parâmetros
+  const query = req.query;
+  const queryString = new URLSearchParams(query).toString();
+  res.redirect(`/products?${queryString}`);
 });
 
+// ========================
+// GET /products/:id – detalhe do produto
+// ========================
 router.get('/:id', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -118,6 +147,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// ========================
+// POST /products – criar produto
+// ========================
 router.post('/', upload.array('images', 6), async (req, res) => {
   const { nome, marca, preco, descricao, category_id, tamanhos } = req.body;
   if (!nome || !marca || !preco || !category_id) {
@@ -167,9 +199,12 @@ router.post('/', upload.array('images', 6), async (req, res) => {
   }
 });
 
+// ========================
+// PUT /products/:id – atualizar produto
+// ========================
 router.put('/:id', upload.array('newImages', 6), async (req, res) => {
   const { id } = req.params;
-  const { nome, marca, preco, descricao, category_id, tamanhos, imagesToDelete } = req.body;
+  const { nome, marca, preco, descricao, category_id, tamanhos, imagesToDelete, imagesOrder } = req.body;
 
   const connection = await db.promise().getConnection();
   try {
@@ -181,7 +216,18 @@ router.put('/:id', upload.array('newImages', 6), async (req, res) => {
     );
 
     if (imagesToDelete && imagesToDelete.length) {
-      await connection.query('DELETE FROM ProductsImages WHERE image_id IN (?) AND product_id = ?', [imagesToDelete, id]);
+      const ids = JSON.parse(imagesToDelete);
+      await connection.query('DELETE FROM ProductsImages WHERE image_id IN (?) AND product_id = ?', [ids, id]);
+    }
+
+    if (imagesOrder) {
+      const orderArray = JSON.parse(imagesOrder);
+      for (let idx = 0; idx < orderArray.length; idx++) {
+        await connection.query(
+          'UPDATE ProductsImages SET order_index = ? WHERE image_id = ? AND product_id = ?',
+          [idx, orderArray[idx], id]
+        );
+      }
     }
 
     if (req.files && req.files.length) {
@@ -227,6 +273,9 @@ router.put('/:id', upload.array('newImages', 6), async (req, res) => {
   }
 });
 
+// ========================
+// DELETE /products/:id
+// ========================
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {

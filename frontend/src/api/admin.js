@@ -46,15 +46,9 @@ export async function createAdminProduct(formData) {
 
 export async function updateAdminProduct(id, formData) {
   const key = getAdminKey();
-  console.log('🔵 updateAdminProduct chamado com ID:', id);
-  // Log do conteúdo do FormData
-  for (let [key, value] of formData.entries()) {
-    console.log(`🔵 FormData: ${key} = ${value}`);
-  }
   const res = await api.put(`/admin/Products/${id}`, formData, {
     headers: { 'x-admin-key': key },
   });
-  console.log('🔵 Resposta do update:', res.data);
   return res.data;
 }
 
@@ -67,7 +61,7 @@ export async function deleteAdminProduct(id) {
 }
 
 // =======================
-// ADMIN CATEGORIES
+// ADMIN CATEGORIES (CORRIGIDO)
 // =======================
 export async function getAdminCategories(queryString = '') {
   const key = getAdminKey();
@@ -77,19 +71,32 @@ export async function getAdminCategories(queryString = '') {
   return res.data;
 }
 
-export async function createAdminCategory(payload) {
+// CRIAÇÃO – aceita FormData
+export async function createAdminCategory(formData) {
   const key = getAdminKey();
-  const res = await api.post('/admin/Categories', payload, {
+  const res = await api.post('/admin/Categories', formData, {
     headers: { 'x-admin-key': key },
+    // Não definir Content-Type – o browser define com boundary
   });
   return res.data;
 }
 
-export async function updateAdminCategory(id, payload) {
+// EDIÇÃO – aceita FormData (URL CORRETO)
+export async function updateAdminCategory(id, formData) {
   const key = getAdminKey();
-  const res = await api.put(`/admin/Categories/${id}`, payload, {
+  console.log('🔵 updateAdminCategory chamado com ID:', id);
+  // Log do FormData para depuração
+  for (let [key, value] of formData.entries()) {
+    if (key === 'image' && value instanceof File) {
+      console.log(`🔵 FormData: ${key} = File: ${value.name} (${value.size} bytes)`);
+    } else {
+      console.log(`🔵 FormData: ${key} = ${value}`);
+    }
+  }
+  const res = await api.put(`/admin/Categories/${id}`, formData, {
     headers: { 'x-admin-key': key },
   });
+  console.log('🔵 Resposta do update:', res.data);
   return res.data;
 }
 
