@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import SocialFloat from './components/SocialFloat';
@@ -14,19 +14,37 @@ import Categories from './pages/Categories';
 import CategoryProducts from './pages/CategoryProducts';
 import PaypalReturn from './pages/PaypalReturn';
 import FAQ from './pages/FAQ';
-import ForgotPassword from './pages/ForgotPassword';   // <-- NOVO
-import ResetPassword from './pages/ResetPassword';     // <-- NOVO
-
-import AdminSearchOrders from './pages/admin/AdminSearchOrders';
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminOrders from './pages/admin/AdminOrders';
-import AdminProducts from './pages/admin/AdminProducts';
-import AdminPanel from './pages/admin/AdminPanel';
-import AdminCategories from './pages/admin/AdminCategories';
-import AdminNotifications from './pages/admin/AdminNotifications';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Search from './pages/Search';
 import Checkout from './pages/Checkout';
 
+// Admin
+import AdminPanel from './pages/admin/AdminPanel';
+import AdminOrders from './pages/admin/AdminOrders';
+import AdminProducts from './pages/admin/AdminProducts';
+import AdminCategories from './pages/admin/AdminCategories';
+import AdminNotifications from './pages/admin/AdminNotifications';
+import AdminSearchOrders from './pages/admin/AdminSearchOrders';
+
+// ============================================================
+// COMPONENTE DE PROTEÇÃO DE ROTAS ADMIN
+// ============================================================
+function AdminRoute({ children }) {
+  const adminKey = localStorage.getItem('admin_key');
+  const userTipo = localStorage.getItem('user_tipo');
+
+  // Verifica se tem a chave admin E se o utilizador é Administrador
+  if (!adminKey || adminKey.trim().length === 0 || userTipo !== 'Administrador') {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
+// ============================================================
+// APP
+// ============================================================
 export default function App() {
   return (
     <BrowserRouter>
@@ -34,7 +52,7 @@ export default function App() {
         <Navbar />
         <main style={{ flex: 1 }}>
           <Routes>
-            {/* User */}
+            {/* Utilizador */}
             <Route path="/" element={<Home />} />
             <Route path="/products/:id" element={<ProductDetails />} />
             <Route path="/login" element={<Login />} />
@@ -47,23 +65,61 @@ export default function App() {
             <Route path="/checkout/:orderId" element={<Checkout />} />
             <Route path="/paypal-return" element={<PaypalReturn />} />
             <Route path="/faq" element={<FAQ />} />
-
-            {/* Password recovery */}
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-            {/* Admin */}
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="/admin/orders" element={<AdminOrders />} />
-            <Route path="/admin/products" element={<AdminProducts />} />
-            <Route path="/admin/categories" element={<AdminCategories />} />
-            <Route path="/admin/notifications" element={<AdminNotifications />} />
-            <Route path="/admin/search-orders" element={<AdminSearchOrders />} />
+            {/* Admin – todas protegidas (redirecionam para / se não for admin) */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminPanel />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/orders"
+              element={
+                <AdminRoute>
+                  <AdminOrders />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/products"
+              element={
+                <AdminRoute>
+                  <AdminProducts />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/categories"
+              element={
+                <AdminRoute>
+                  <AdminCategories />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/notifications"
+              element={
+                <AdminRoute>
+                  <AdminNotifications />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/search-orders"
+              element={
+                <AdminRoute>
+                  <AdminSearchOrders />
+                </AdminRoute>
+              }
+            />
           </Routes>
         </main>
         <Footer />
-        {/* Floats */}
         <FAQFloat />
         <SocialFloat />
       </div>

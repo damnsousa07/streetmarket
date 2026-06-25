@@ -1,6 +1,7 @@
 // Search.jsx
 // Página de pesquisa e filtragem de produtos com base em parâmetros da URL.
-// Permite filtrar por termo, categoria, marca, género, faixa de preço e ordenação.
+// Permite filtrar por termo, categoria, marca, género, faixa de preço e ordenação,
+// com paginação.
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
@@ -24,6 +25,13 @@ export default function Search() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // Paginação
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageInput, setPageInput] = useState('');
+    const limit = 12;
+
+    // Lê os parâmetros da URL
     const q = searchParams.get('q') || '';
     const category_id = searchParams.get('category_id') || '';
     const brand = searchParams.get('brand') || '';
@@ -32,26 +40,35 @@ export default function Search() {
     const max_price = searchParams.get('max_price') || '';
     const sort = searchParams.get('sort') || 'price_asc';
 
+    // Buscar produtos com paginação
+    const fetchProducts = async (page = 1) => {
+        setLoading(true);
+        setError('');
+
+        try {
+            const filters = { q, category_id, brand, gender, min_price, max_price, sort, page, limit };
+            const response = await searchProducts(filters);
+            console.log('📦 Resposta do Search:', response);
+            setProducts(response.data || []);
+            setCurrentPage(response.meta?.currentPage || 1);
+            setTotalPages(response.meta?.totalPages || 1);
+            setPageInput((response.meta?.currentPage || 1).toString());
+        } catch (err) {
+            setError('Erro ao carregar resultados.');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Quando os filtros mudarem, reset para página 1
     useEffect(() => {
-        const fetchProducts = async () => {
-            setLoading(true);
-            setError('');
-
-            try {
-                const filters = { q, category_id, brand, gender, min_price, max_price, sort };
-                const response = await searchProducts(filters);
-                setProducts(response.data || []);
-            } catch (err) {
-                setError('Erro ao carregar resultados.');
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchProducts();
+        setCurrentPage(1);
+        fetchProducts(1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q, category_id, brand, gender, min_price, max_price, sort]);
 
+    // Carregar categorias e marcas
     useEffect(() => {
         const loadCategories = async () => {
             try {
@@ -61,10 +78,6 @@ export default function Search() {
                 console.error('Erro ao carregar categorias', err);
             }
         };
-        loadCategories();
-    }, []);
-
-    useEffect(() => {
         const loadBrands = async () => {
             try {
                 const data = await getBrands();
@@ -73,9 +86,11 @@ export default function Search() {
                 console.error('Erro ao carregar marcas', err);
             }
         };
+        loadCategories();
         loadBrands();
     }, []);
 
+    // Handlers de filtro
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         const newParams = new URLSearchParams(searchParams);
@@ -89,6 +104,33 @@ export default function Search() {
 
     const clearFilters = () => {
         setSearchParams({ q: '', category_id: '', brand: '', gender: '', min_price: '', max_price: '', sort: 'price_asc' });
+    };
+
+    // Navegação de páginas
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            setCurrentPage(newPage);
+            fetchProducts(newPage);
+        }
+    };
+
+    const handlePageInputSubmit = (e) => {
+        e.preventDefault();
+        const page = Number(pageInput);
+        if (!isNaN(page) && page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+            fetchProducts(page);
+        } else {
+            setPageInput(currentPage.toString());
+        }
+    };
+
+    const getPageNumbers = () => {
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) {
+            pages.push(i);
+        }
+        return pages;
     };
 
     return (
@@ -245,6 +287,70 @@ export default function Search() {
                             </Link>
                         ))}
                     </div>
+
+                    {/* Paginação */}
+                    {totalPages > 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '32px', flexWrap: 'wrap' }}>
+                            <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="btn btn-ghost"
+                                style={{ padding: '0 16px' }}
+                            >
+                                Anterior
+                            </button>
+                            {getPageNumbers().map(num => (
+                                <button
+                                    key={num}
+                                    onClick={() => handlePageChange(num)}
+                                    className="btn"
+                                    style={{
+                                        padding: '0 14px',
+                                        background: num === currentPage ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                                        color: num === currentPage ? '#fff' : 'var(--text)',
+                                        border: '1px solid ' + (num === currentPage ? 'transparent' : 'rgba(255,255,255,0.12)'),
+                                        minWidth: '40px',
+                                    }}
+                                >
+                                    {num}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="btn btn-ghost"
+                                style={{ padding: '0 16px' }}
+                            >
+                                Próximo
+                            </button>
+
+                            <form onSubmit={handlePageInputSubmit} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
+                                <span style={{ fontSize: '14px', color: 'var(--muted)' }}>Ir para</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max={totalPages}
+                                    value={pageInput}
+                                    onChange={(e) => setPageInput(e.target.value)}
+                                    style={{
+                                        width: '60px',
+                                        height: '36px',
+                                        padding: '4px 6px',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border)',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        color: 'var(--text)',
+                                        textAlign: 'center',
+                                        fontSize: '14px',
+                                    }}
+                                />
+                                <span style={{ fontSize: '14px', color: 'var(--muted)' }}>de {totalPages}</span>
+                                <button type="submit" className="btn btn-ghost" style={{ padding: '0 12px', height: '36px' }}>
+                                    Ir
+                                </button>
+                            </form>
+                        </div>
+                    )}
                 </main>
             </div>
         </div>

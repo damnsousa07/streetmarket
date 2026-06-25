@@ -22,7 +22,7 @@ const upload = multer({
 });
 
 // ========================
-// GET /products – com paginação e filtros (incluindo gender)
+// GET /products – com paginação e filtros
 // ========================
 router.get('/', async (req, res) => {
   try {
@@ -134,7 +134,7 @@ router.get('/search', async (req, res) => {
 });
 
 // ========================
-// GET /products/:id – detalhe do produto
+// GET /products/:id – detalhe do produto com info de review
 // ========================
 router.get('/:id', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -142,6 +142,11 @@ router.get('/:id', async (req, res) => {
   res.setHeader('Expires', '0');
 
   const { id } = req.params;
+  const userId = req.query.userId ? parseInt(req.query.userId) : null;
+
+  console.log('🔍 userId (query):', userId);
+  console.log('🔍 product_id:', id);
+
   try {
     const [rows] = await db.promise().query('SELECT * FROM Products WHERE product_id = ?', [id]);
     if (rows.length === 0) return res.status(404).json({ message: 'Produto não encontrado' });
@@ -153,6 +158,32 @@ router.get('/:id', async (req, res) => {
     );
     product.images = images;
     product.imagem = images[0]?.image_url || null;
+
+    let canReview = false;
+    let userReview = null;
+
+    if (userId) {
+      const [orders] = await db.promise().query(
+        `SELECT * FROM FakeOrders 
+         WHERE user_id = ? AND product_id = ? AND status_id = 3`,
+        [userId, id]
+      );
+      console.log('🔍 Encomendas recebidas:', orders);
+      if (orders.length > 0) {
+        canReview = true;
+        const [reviews] = await db.promise().query(
+          'SELECT * FROM Reviews WHERE user_id = ? AND product_id = ?',
+          [userId, id]
+        );
+        if (reviews.length > 0) {
+          canReview = false;
+          userReview = reviews[0];
+        }
+      }
+    }
+
+    product.canReview = canReview;
+    product.userReview = userReview;
 
     res.json(product);
   } catch (err) {
@@ -214,7 +245,7 @@ router.post('/', upload.array('images', 6), async (req, res) => {
 });
 
 // ========================
-// PUT /products/:id – atualizar produto (incluindo gender)
+// PUT /products/:id – atualizar produto
 // ========================
 router.put('/:id', upload.array('newImages', 6), async (req, res) => {
   const { id } = req.params;

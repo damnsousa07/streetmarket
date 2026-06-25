@@ -109,8 +109,6 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
   );
 });
 
-// ------------------------------------------------------------
-// Componente de formulário ISOLADO (memoizado) – NUNCA perde o foco
 const ProductForm = memo(({
   editingProduct,
   categories,
@@ -126,7 +124,6 @@ const ProductForm = memo(({
   removeExistingImage,
   setModalImage,
 }) => {
-  // REFS para os campos – sem estado, sem re-renderização
   const nomeRef = useRef(null);
   const marcaRef = useRef(null);
   const precoRef = useRef(null);
@@ -134,6 +131,7 @@ const ProductForm = memo(({
   const categoryIdRef = useRef(null);
   const tamanhosRef = useRef(null);
   const genderRef = useRef(null);
+  const stockRef = useRef(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -145,6 +143,7 @@ const ProductForm = memo(({
       category_id: categoryIdRef.current?.value || '',
       tamanhos: tamanhosRef.current?.value || '',
       gender: genderRef.current?.value || 'Unisexo',
+      stock: parseInt(stockRef.current?.value) || 0,
     };
     onRequestConfirm(data);
   };
@@ -204,7 +203,17 @@ const ProductForm = memo(({
             <option value="Unisexo">Unisexo</option>
           </select>
         </div>
-
+        <div>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Stock</label>
+          <input
+            className="input"
+            name="stock"
+            type="number"
+            ref={stockRef}
+            defaultValue={editingProduct?.stock ?? 0}
+            min="0"
+          />
+        </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Tamanhos (separados por vírgula)</label>
           <input
@@ -322,8 +331,6 @@ const ProductForm = memo(({
   );
 });
 
-// ------------------------------------------------------------
-// Componente principal
 export default function AdminProducts({ embedded = false }) {
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -341,7 +348,6 @@ export default function AdminProducts({ embedded = false }) {
     sort: 'id_desc',
   });
 
-  // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageInput, setPageInput] = useState('');
@@ -373,7 +379,6 @@ export default function AdminProducts({ embedded = false }) {
 
   const hasKey = useMemo(() => requireAdminKey(), []);
 
-  // ------------------------------------------------------------
   const fetchProducts = useCallback(async (page = currentPage) => {
     if (!requireAdminKey()) {
       setError('Sem admin key.');
@@ -392,7 +397,6 @@ export default function AdminProducts({ embedded = false }) {
       params.append('page', page);
       params.append('limit', limit);
       const data = await getAdminProducts(params.toString());
-      // A API devolve { data: [...], meta: {...} }
       setRows(data.data || []);
       setCurrentPage(data.meta?.currentPage || 1);
       setTotalPages(data.meta?.totalPages || 1);
@@ -410,7 +414,6 @@ export default function AdminProducts({ embedded = false }) {
     fetchProducts();
   }, [fetchProducts]);
 
-  // ------------------------------------------------------------
   async function loadCategories() {
     if (!requireAdminKey()) {
       setLoadingCats(false);
@@ -461,7 +464,6 @@ export default function AdminProducts({ embedded = false }) {
     fetchProducts(currentPage);
   };
 
-  // ------------------------------------------------------------
   async function startEdit(product) {
     try {
       const productId = product.product_id ?? product.Product_id;
@@ -501,7 +503,6 @@ export default function AdminProducts({ embedded = false }) {
     setExistingImages(prev => prev.filter(img => img.image_id !== imageId));
   }
 
-  // ------------------------------------------------------------
   const onRequestConfirm = (formData) => {
     setPendingFormData(formData);
     setShowConfirmModal(true);
@@ -572,9 +573,8 @@ export default function AdminProducts({ embedded = false }) {
 
   const closeDeleteErrorModal = () => setShowDeleteErrorModal(false);
 
-  // ------------------------------------------------------------
   const handleFormSubmit = async (formDataRaw) => {
-    const { nome, marca, preco, descricao, category_id, tamanhos, gender } = formDataRaw;
+    const { nome, marca, preco, descricao, category_id, tamanhos, gender, stock } = formDataRaw;
 
     const nomeValue = nome.trim();
     const marcaValue = marca.trim();
@@ -583,8 +583,9 @@ export default function AdminProducts({ embedded = false }) {
     const categoryIdValue = category_id;
     const tamanhosValue = tamanhos.trim();
     const genderValue = gender || 'Unisexo';
+    const stockValue = parseInt(stock) || 0;
 
-    console.log('📝 VALORES RECEBIDOS DO FORM:', { nomeValue, marcaValue, precoValue, descricaoValue, categoryIdValue, tamanhosValue, genderValue });
+    console.log('📝 VALORES RECEBIDOS DO FORM:', { nomeValue, marcaValue, precoValue, descricaoValue, categoryIdValue, tamanhosValue, genderValue, stockValue });
 
     if (!nomeValue || !marcaValue || !precoValue || !categoryIdValue) {
       setError('Nome, marca, preço e categoria são obrigatórios.');
@@ -604,6 +605,7 @@ export default function AdminProducts({ embedded = false }) {
     formData.append('category_id', Number(categoryIdValue));
     formData.append('tamanhos', tamanhosValue || '');
     formData.append('gender', genderValue);
+    formData.append('stock', stockValue);
     imageFiles.forEach(file => formData.append('images', file));
 
     try {
@@ -629,6 +631,7 @@ export default function AdminProducts({ embedded = false }) {
           category_id: categoryIdValue,
           tamanhos: tamanhosValue,
           gender: genderValue,
+          stock: stockValue,
           imagesToDelete,
           imagesOrder: newOrder
         });
@@ -667,7 +670,6 @@ export default function AdminProducts({ embedded = false }) {
 
   const closeSuccessModal = () => setShowSuccessModal(false);
 
-  // Paginação
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
@@ -706,7 +708,6 @@ export default function AdminProducts({ embedded = false }) {
     );
   }
 
-  // ------------------------------------------------------------
   return (
     <Wrapper>
       {!embedded && (
@@ -762,6 +763,7 @@ export default function AdminProducts({ embedded = false }) {
                   <th style={{ padding: 10 }}>Preço</th>
                   <th style={{ padding: 10 }}>Categoria</th>
                   <th style={{ padding: 10 }}>Género</th>
+                  <th style={{ padding: 10 }}>Stock</th>
                   <th style={{ padding: 10 }}></th>
                 </tr>
               </thead>
@@ -791,6 +793,7 @@ export default function AdminProducts({ embedded = false }) {
                       <td style={{ padding: 10, fontWeight: 800 }}>€{r.preco}</td>
                       <td style={{ padding: 10 }}>{r.category_id}</td>
                       <td style={{ padding: 10 }}>{r.gender || 'Unisexo'}</td>
+                      <td style={{ padding: 10 }}>{r.stock ?? 0}</td>
                       <td style={{ padding: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button className="btn btn-ghost" onClick={() => startEdit(r)}>Editar</button>
                         <button className="btn btn-ghost" onClick={() => openDeleteConfirm(id, r.nome)} style={{ marginLeft: 8 }}>Apagar</button>
@@ -800,13 +803,12 @@ export default function AdminProducts({ embedded = false }) {
                 })}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: 14, color: 'var(--muted)' }}>Sem produtos.</td>
+                    <td colSpan={9} style={{ padding: 14, color: 'var(--muted)' }}>Sem produtos.</td>
                   </tr>
                 )}
               </tbody>
             </table>
 
-            {/* Paginação */}
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
                 <button
@@ -842,7 +844,6 @@ export default function AdminProducts({ embedded = false }) {
                   Próximo
                 </button>
 
-                {/* Input para saltar página */}
                 <form onSubmit={handlePageInputSubmit} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
                   <span style={{ fontSize: '14px', color: 'var(--muted)' }}>Ir para</span>
                   <input
@@ -878,7 +879,6 @@ export default function AdminProducts({ embedded = false }) {
         <ImageModal src={modalImage} alt="Produto" onClose={() => setModalImage(null)} />
       )}
 
-      {/* Modais (mantidos iguais) */}
       {showConfirmModal && (
         <div
           style={{

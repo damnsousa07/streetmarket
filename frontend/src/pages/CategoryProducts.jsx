@@ -1,5 +1,6 @@
 // CategoryProducts.jsx
-// Página que exibe todos os produtos de uma categoria específica com paginação.
+// Página que exibe os produtos de uma categoria específica com paginação.
+// Copiado da Home.jsx com ajuste para category_id.
 
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
@@ -21,14 +22,12 @@ export default function CategoryProducts() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [categoryName, setCategoryName] = useState('');
-
-    // Paginação
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [pageInput, setPageInput] = useState('');
     const limit = 12;
 
-    // Carregar produtos da categoria com paginação
+    // --- Buscar produtos com paginação e filtro de categoria ---
     const fetchProducts = async (page = 1) => {
         try {
             setLoading(true);
@@ -38,6 +37,7 @@ export default function CategoryProducts() {
                 page,
                 limit,
             });
+            console.log('📦 Resposta da API (categoria):', response);
             setProducts(response.data || []);
             setCurrentPage(response.meta?.currentPage || 1);
             setTotalPages(response.meta?.totalPages || 1);
@@ -50,7 +50,7 @@ export default function CategoryProducts() {
         }
     };
 
-    // Carregar nome da categoria
+    // --- Buscar nome da categoria ---
     const fetchCategoryName = async () => {
         try {
             const categories = await getCategories();
@@ -61,15 +61,15 @@ export default function CategoryProducts() {
         }
     };
 
+    // --- Sempre que a categoria mudar, reiniciar página e carregar ---
     useEffect(() => {
-        // Reset page quando mudar a categoria
         setCurrentPage(1);
         fetchProducts(1);
         fetchCategoryName();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [category_id]);
 
-    // Navegação entre páginas
+    // --- Funções de navegação ---
     const handlePageChange = (newPage) => {
         if (newPage >= 1 && newPage <= totalPages) {
             setCurrentPage(newPage);
@@ -96,6 +96,7 @@ export default function CategoryProducts() {
         return pages;
     };
 
+    // --- Renderização ---
     if (loading && products.length === 0) {
         return <p style={{ padding: '32px 0', textAlign: 'center' }}>A carregar produtos...</p>;
     }
@@ -157,7 +158,7 @@ export default function CategoryProducts() {
                         ))}
                     </div>
 
-                    {/* Paginação */}
+                    {/* Paginação – igual à Home */}
                     {totalPages > 1 && (
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '32px', flexWrap: 'wrap' }}>
                             <button
@@ -193,7 +194,6 @@ export default function CategoryProducts() {
                                 Próximo
                             </button>
 
-                            {/* Input para saltar página */}
                             <form onSubmit={handlePageInputSubmit} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
                                 <span style={{ fontSize: '14px', color: 'var(--muted)' }}>Ir para</span>
                                 <input

@@ -17,6 +17,70 @@ try {
   console.error('Erro ao configurar PayPal:', error);
 }
 
+// ---------- FUNÇÃO AUXILIAR PARA ENVIAR EMAIL ----------
+async function sendOrderConfirmationEmail(orderId, user_id) {
+  try {
+    const [orders] = await db.promise().query(
+      `SELECT fo.*, p.nome AS product_nome, p.preco, p.imagem 
+       FROM FakeOrders fo 
+       JOIN Products p ON fo.product_id = p.product_id 
+       WHERE fo.order_id = ?`,
+      [orderId]
+    );
+    if (orders.length === 0) return;
+
+    const [users] = await db.promise().query('SELECT * FROM Users WHERE user_id = ?', [user_id]);
+    if (users.length === 0) return;
+
+    const order = orders[0];
+    const user = users[0];
+
+    const items = [{
+      nome: order.product_nome,
+      preco: order.preco,
+      quantidade: 1
+    }];
+
+    const orderDate = new Date(order.data_compra);
+    const formattedDate = orderDate.toLocaleDateString('pt-PT', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    await sendOrderEmail({
+      to: user.email,
+      nomeCliente: user.nome || 'Cliente',
+      orderNumber: order.order_id,
+      orderDate: formattedDate,
+      items: items,
+      total: order.preco,
+      produtoImagem: order.imagem || null,
+      marca: 'StreetMarket'
+    });
+
+    console.log(`✅ Email de confirmação enviado para ${user.email}`);
+  } catch (err) {
+    console.error('❌ Erro ao enviar email de confirmação:', err);
+  }
+}
+
+// ---------- ROTA PARA ENVIAR EMAIL (FORÇADO) ----------
+router.post('/send-order-email', async (req, res) => {
+  const { orderId, userId } = req.body;
+  if (!orderId || !userId) {
+    return res.status(400).json({ message: 'Faltam dados.' });
+  }
+
+  try {
+    await sendOrderConfirmationEmail(orderId, userId);
+    res.json({ message: 'Email enviado com sucesso.' });
+  } catch (err) {
+    console.error('❌ Erro ao enviar email:', err);
+    res.status(500).json({ message: 'Erro ao enviar email.' });
+  }
+});
+
 // ---------- STRIPE ----------
 router.post('/create-payment-intent', async (req, res) => {
   const { amount, orderId, user_id } = req.body;
@@ -36,7 +100,7 @@ router.post('/create-payment-intent', async (req, res) => {
   }
 });
 
-// Webhook do Stripe (para confirmar pagamento)
+// Webhook do Stripe
 router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
@@ -47,16 +111,11 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
   }
   if (event.type === 'payment_intent.succeeded') {
     const { orderId, user_id } = event.data.object.metadata;
-    await db.promise().query('UPDATE FakeOrders SET status_id = 2, payment_method = "stripe" WHERE order_id = ?', [orderId]);
-    // Enviar email de confirmação (buscar dados)
-    const [orders] = await db.promise().query('SELECT * FROM FakeOrders WHERE order_id = ?', [orderId]);
-    if (orders.length > 0) {
-      const [users] = await db.promise().query('SELECT * FROM Users WHERE user_id = ?', [user_id]);
-      const [products] = await db.promise().query('SELECT * FROM Products WHERE product_id = ?', [orders[0].product_id]);
-      if (users.length && products.length) {
-        // chamar sendOrderEmail com os dados (igual ao que já usas)
-      }
-    }
+    await db.promise().query(
+      'UPDATE FakeOrders SET status_id = 2, payment_method = "stripe" WHERE order_id = ?',
+      [orderId]
+    );
+    await sendOrderConfirmationEmail(orderId, user_id);
   }
   res.json({ received: true });
 });
@@ -102,7 +161,11 @@ router.post('/capture-paypal-order', async (req, res) => {
   try {
     const capture = await paypalClient.execute(request);
     if (capture.result.status === 'COMPLETED') {
-      await db.promise().query('UPDATE FakeOrders SET status_id = 2, payment_method = "paypal" WHERE order_id = ?', [orderId]);
+      await db.promise().query(
+        'UPDATE FakeOrders SET status_id = 2, payment_method = "paypal" WHERE order_id = ?',
+        [orderId]
+      );
+      await sendOrderConfirmationEmail(orderId, user_id);
       res.json({ message: 'Pagamento confirmado!' });
     } else {
       res.status(400).json({ message: 'Pagamento não completado.' });

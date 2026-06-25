@@ -78,13 +78,14 @@ export default function ProductDetails() {
     const [sendingReview, setSendingReview] = useState(false);
     const [sendingReviewError, setSendingReviewError] = useState('');
 
+    const [canReview, setCanReview] = useState(false);
+    const [userReview, setUserReview] = useState(null);
+
     const user_id = localStorage.getItem('user_id');
     const canBuy = useMemo(() => isSessionValid(), []);
 
-    const hasReviewed = useMemo(() => {
-        if (!user_id) return false;
-        return (reviews || []).some((r) => Number(r.user_id) === Number(user_id));
-    }, [reviews, user_id]);
+    const hasReviewed = userReview !== null;
+    const showReviewForm = canReview && !hasReviewed;
 
     const avgRating = useMemo(() => {
         if (!reviews?.length) return 0;
@@ -101,10 +102,14 @@ export default function ProductDetails() {
         try {
             setLoading(true);
             setError('');
-            const data = await getProductById(id);
+            const userId = localStorage.getItem('user_id');
+            const data = await getProductById(id, userId);
             const normalized = Array.isArray(data) ? data[0] : data;
             setProduct(normalized || null);
-            
+
+            setCanReview(normalized?.canReview || false);
+            setUserReview(normalized?.userReview || null);
+
             if (normalized?.images && normalized.images.length > 0) {
                 const primary = normalized.images.find(img => img.is_primary) || normalized.images[0];
                 setMainImage(primary.image_url);
@@ -163,6 +168,10 @@ export default function ProductDetails() {
             setBuyError('Por favor, seleciona um tamanho antes de comprar.');
             return;
         }
+        if ((product.stock ?? 0) <= 0) {
+            setBuyError('Produto sem stock disponível.');
+            return;
+        }
         const uid = localStorage.getItem('user_id');
         if (!uid) {
             setBuyError('Tens de iniciar sessão para comprar.');
@@ -172,6 +181,7 @@ export default function ProductDetails() {
         try {
             setBuying(true);
             setBuyError('');
+            console.log('🛒 A comprar:', { uid: Number(uid), productId: Number(product.product_id), selectedSize });
             const response = await createOrder(Number(uid), Number(product.product_id), selectedSize);
             navigate(`/checkout/${response.order_id}`, {
                 state: {
@@ -180,6 +190,7 @@ export default function ProductDetails() {
                 },
             });
         } catch (e) {
+            console.error('❌ Erro ao comprar:', e);
             setBuyError('Não foi possível criar a compra.');
         } finally {
             setBuying(false);
@@ -189,7 +200,7 @@ export default function ProductDetails() {
     async function handleSubmitReview(e) {
         e.preventDefault();
         if (!user_id) {
-            alert('Tens de fazer login (definir user_id) para escrever uma review.');
+            alert('Tens de fazer login para escrever uma review.');
             return;
         }
         if (hasReviewed) {
@@ -216,8 +227,9 @@ export default function ProductDetails() {
             });
             setComentario('');
             setRating(5);
+            await loadProduct();
             await loadReviews();
-            alert('Review enviada com sucesso.');
+            alert(`🎉 A sua review para "${product.nome}" foi enviada com sucesso!\nObrigado pela sua opinião.`);
         } catch (e) {
             const status = e?.response?.status;
             const msg = e?.response?.data?.message;
@@ -332,6 +344,10 @@ export default function ProductDetails() {
                         €{product.preco}
                     </div>
 
+                    <div style={{ marginTop: 8, color: 'var(--muted)' }}>
+                        Stock: <strong>{product.stock ?? 0}</strong> unidades
+                    </div>
+
                     {product.descricao ? (
                         <p style={{ color: 'var(--muted)', marginTop: 16, lineHeight: 1.6 }}>
                             {product.descricao}
@@ -374,10 +390,16 @@ export default function ProductDetails() {
                         <button
                             className="btn btn-primary"
                             onClick={handleBuy}
-                            disabled={buying || !isSessionValid()}
-                            title={!isSessionValid() ? 'Tens de iniciar sessão para comprar' : ''}
+                            disabled={buying || !isSessionValid() || (product.stock ?? 0) <= 0}
+                            title={
+                                !isSessionValid() 
+                                    ? 'Tens de iniciar sessão para comprar' 
+                                    : (product.stock ?? 0) <= 0 
+                                    ? 'Produto sem stock disponível' 
+                                    : ''
+                            }
                         >
-                            {buying ? 'A comprar...' : 'Comprar'}
+                            {buying ? 'A comprar...' : (product.stock ?? 0) <= 0 ? 'Sem stock' : 'Comprar'}
                         </button>
                     </div>
 
@@ -448,54 +470,42 @@ export default function ProductDetails() {
                     )}
                 </div>
 
-                <div className="card" style={{ padding: 14, marginTop: 12 }}>
-                    <h3 style={{ marginTop: 0 }}>Escrever uma review</h3>
+                {showReviewForm && (
+                    <div className="card" style={{ padding: 14, marginTop: 12 }}>
+                        <h3 style={{ marginTop: 0 }}>Escrever uma review</h3>
+                        <form onSubmit={handleSubmitReview} style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+                            <div>
+                                <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Pontuação</div>
+                                <Stars value={rating} onChange={setRating} readOnly={false} />
+                            </div>
 
-                    {!user_id && (
-                        <p style={{ color: 'salmon', marginTop: 6 }}>
-                            Tens de fazer login (definir <strong>user_id</strong>) para escrever uma review.
-                        </p>
-                    )}
+                            <div>
+                                <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Comentário</div>
+                                <textarea
+                                    className="input"
+                                    style={{ minHeight: 100, resize: 'vertical', padding: 12 }}
+                                    value={comentario}
+                                    onChange={(e) => setComentario(e.target.value)}
+                                    placeholder="Escreve aqui a tua opinião..."
+                                />
+                            </div>
 
-                    {user_id && hasReviewed && (
-                        <p style={{ color: 'var(--muted)', marginTop: 6 }}>
-                            Já escreveste uma review para este produto.
-                        </p>
-                    )}
+                            {sendingReviewError && (
+                                <p style={{ color: 'salmon', margin: 0 }}>{sendingReviewError}</p>
+                            )}
 
-                    <form onSubmit={handleSubmitReview} style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-                        <div>
-                            <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Pontuação</div>
-                            <Stars value={rating} onChange={setRating} readOnly={hasReviewed} />
-                        </div>
-
-                        <div>
-                            <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Comentário</div>
-                            <textarea
-                                className="input"
-                                style={{ minHeight: 100, resize: 'vertical', padding: 12 }}
-                                value={comentario}
-                                onChange={(e) => setComentario(e.target.value)}
-                                placeholder="Escreve aqui a tua opinião..."
-                                disabled={!user_id || hasReviewed}
-                            />
-                        </div>
-
-                        {sendingReviewError && (
-                            <p style={{ color: 'salmon', margin: 0 }}>{sendingReviewError}</p>
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <button
-                                className="btn btn-primary"
-                                type="submit"
-                                disabled={sendingReview || !user_id || hasReviewed}
-                            >
-                                {sendingReview ? 'A enviar...' : 'Enviar review'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <button
+                                    className="btn btn-primary"
+                                    type="submit"
+                                    disabled={sendingReview}
+                                >
+                                    {sendingReview ? 'A enviar...' : 'Enviar review'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                )}
             </div>
         </div>
     );

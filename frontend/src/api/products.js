@@ -1,8 +1,6 @@
 // products.js
 import { api } from './client';
 
-// Obtém lista de produtos com paginação e filtros
-// filters: { page, limit, q, category_id, brand, gender, min_price, max_price, sort }
 export async function getProducts(filters = {}) {
   const params = new URLSearchParams();
   if (filters.page) params.append('page', filters.page);
@@ -16,11 +14,16 @@ export async function getProducts(filters = {}) {
   if (filters.sort) params.append('sort', filters.sort);
 
   const response = await api.get(`/products?${params.toString()}`);
-  return response.data; // { data: [...], meta: { total, totalPages, currentPage, limit } }
+  return response.data;
 }
 
-export async function getProductById(id) {
-  const response = await api.get(`/products/${id}`);
+export async function getProductById(id, userId = null) {
+  const params = new URLSearchParams();
+  if (userId) {
+    params.append('userId', userId);
+  }
+  const url = `/products/${id}${params.toString() ? `?${params.toString()}` : ''}`;
+  const response = await api.get(url);
   return response.data;
 }
 

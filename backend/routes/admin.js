@@ -87,7 +87,6 @@ router.post('/Categories', upload.single('image'), async (req, res) => {
 
   let imageUrl = null;
   if (req.file) {
-    // O multer já guardou com o prefixo cat-
     imageUrl = `/uploads/categories/${req.file.filename}`;
     console.log('✅ Ficheiro guardado:', imageUrl);
   } else {
@@ -121,7 +120,6 @@ router.put('/Categories/:id', upload.single('image'), async (req, res) => {
     imageUrl = `/uploads/categories/${req.file.filename}`;
     console.log('✅ Nova imagem guardada:', imageUrl);
 
-    // Apagar a imagem antiga
     const [old] = await db.promise().query('SELECT image_url FROM Categories WHERE category_id = ?', [id]);
     if (old.length > 0 && old[0].image_url) {
       const oldPath = path.join(__dirname, '..', old[0].image_url);
@@ -187,7 +185,7 @@ router.delete('/Categories/:id', async (req, res) => {
 });
 
 // ============================================================
-// ROTAS DE PRODUTOS (paginação, CRUD, etc.)
+// ROTAS DE PRODUTOS
 // ============================================================
 
 router.get('/Products', async (req, res) => {
@@ -312,7 +310,7 @@ router.post('/Products', upload.array('images', 6), async (req, res) => {
   console.log('POST /admin/Products - req.body:', req.body);
   console.log('POST /admin/Products - req.files:', req.files ? req.files.length : 0);
 
-  const { nome, marca, preco, descricao, category_id, tamanhos } = req.body;
+  const { nome, marca, preco, descricao, category_id, tamanhos, gender, stock } = req.body;
 
   if (!nome || !marca || !preco || !category_id) {
     return res.status(400).json({
@@ -326,8 +324,8 @@ router.post('/Products', upload.array('images', 6), async (req, res) => {
     await connection.beginTransaction();
 
     const [result] = await connection.query(
-      'INSERT INTO Products (nome, marca, preco, descricao, category_id, tamanhos, data_criacao) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-      [nome, marca, preco, descricao || null, category_id, tamanhos || null]
+      'INSERT INTO Products (nome, marca, preco, descricao, category_id, tamanhos, gender, stock, data_criacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+      [nome, marca, preco, descricao || null, category_id, tamanhos || null, gender || 'Unisexo', stock || 0]
     );
     const productId = result.insertId;
 
@@ -364,12 +362,13 @@ router.post('/Products', upload.array('images', 6), async (req, res) => {
   }
 });
 
+// ===== PUT /Products/:id (COM STOCK CORRIGIDO) =====
 router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
   const { id } = req.params;
   console.log('PUT /admin/Products/:id - req.body:', req.body);
   console.log('PUT /admin/Products/:id - req.files:', req.files ? req.files.length : 0);
 
-  const { nome, marca, preco, descricao, category_id, tamanhos } = req.body;
+  const { nome, marca, preco, descricao, category_id, tamanhos, stock, gender } = req.body;
 
   if (!nome || !marca || !preco || !category_id) {
     return res.status(400).json({
@@ -382,10 +381,12 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    console.log('A atualizar produto com:', { nome, marca, preco, descricao, category_id, tamanhos, id });
+    // 1. ATUALIZA OS DADOS DO PRODUTO (incluindo stock)
+    const stockValue = stock !== undefined && stock !== '' ? parseInt(stock) : 0;
+    console.log('A atualizar produto com:', { nome, marca, preco, descricao, category_id, tamanhos, stockValue, gender, id });
     const [updateResult] = await connection.query(
-      'UPDATE Products SET nome = ?, marca = ?, preco = ?, descricao = ?, category_id = ?, tamanhos = ? WHERE product_id = ?',
-      [nome, marca, preco, descricao || null, category_id, tamanhos || null, id]
+      'UPDATE Products SET nome = ?, marca = ?, preco = ?, descricao = ?, category_id = ?, tamanhos = ?, stock = ?, gender = ? WHERE product_id = ?',
+      [nome, marca, preco, descricao || null, category_id, tamanhos || null, stockValue, gender || 'Unisexo', id]
     );
     console.log('Resultado do update:', updateResult);
     if (updateResult.affectedRows === 0) {
@@ -393,6 +394,7 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       return res.status(404).json({ message: 'Produto não encontrado.' });
     }
 
+    // 2. DELETE imagens
     let imagesToDelete = req.body.imagesToDelete;
     if (imagesToDelete && typeof imagesToDelete === 'string') {
       try { imagesToDelete = JSON.parse(imagesToDelete); } catch (e) { imagesToDelete = []; }
@@ -405,6 +407,7 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       console.log(`Imagens eliminadas: ${imagesToDelete.join(', ')}`);
     }
 
+    // 3. REORDENAÇÃO
     let imagesOrder = req.body.imagesOrder;
     if (imagesOrder && typeof imagesOrder === 'string') {
       try { imagesOrder = JSON.parse(imagesOrder); } catch (e) { imagesOrder = []; }
@@ -430,6 +433,7 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       }
     }
 
+    // 4. ADICIONAR NOVAS IMAGENS
     if (req.files && req.files.length) {
       const [maxOrder] = await connection.query(
         'SELECT COALESCE(MAX(order_index), -1) AS maxIdx FROM ProductsImages WHERE product_id = ?',
@@ -452,6 +456,7 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       console.log(`Novas imagens adicionadas: ${req.files.length}`);
     }
 
+    // 5. ATUALIZA CAMPO imagem
     await connection.query(
       `UPDATE Products 
        SET imagem = (
