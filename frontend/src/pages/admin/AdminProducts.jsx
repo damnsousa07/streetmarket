@@ -126,12 +126,14 @@ const ProductForm = memo(({
   removeExistingImage,
   setModalImage,
 }) => {
+  // REFS para os campos – sem estado, sem re-renderização
   const nomeRef = useRef(null);
   const marcaRef = useRef(null);
   const precoRef = useRef(null);
   const descricaoRef = useRef(null);
   const categoryIdRef = useRef(null);
   const tamanhosRef = useRef(null);
+  const genderRef = useRef(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -142,6 +144,7 @@ const ProductForm = memo(({
       descricao: descricaoRef.current?.value || '',
       category_id: categoryIdRef.current?.value || '',
       tamanhos: tamanhosRef.current?.value || '',
+      gender: genderRef.current?.value || 'Unisexo',
     };
     onRequestConfirm(data);
   };
@@ -186,6 +189,19 @@ const ProductForm = memo(({
             {categories.map(c => (
               <option key={c.category_id} value={c.category_id}>{c.nome} (#{c.category_id})</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Género</label>
+          <select
+            className="input"
+            name="gender"
+            ref={genderRef}
+            defaultValue={editingProduct?.gender || 'Unisexo'}
+          >
+            <option value="Masculino">Masculino</option>
+            <option value="Feminino">Feminino</option>
+            <option value="Unisexo">Unisexo</option>
           </select>
         </div>
 
@@ -325,7 +341,7 @@ export default function AdminProducts({ embedded = false }) {
     sort: 'id_desc',
   });
 
-  // Estados de paginação
+  // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageInput, setPageInput] = useState('');
@@ -376,6 +392,7 @@ export default function AdminProducts({ embedded = false }) {
       params.append('page', page);
       params.append('limit', limit);
       const data = await getAdminProducts(params.toString());
+      // A API devolve { data: [...], meta: {...} }
       setRows(data.data || []);
       setCurrentPage(data.meta?.currentPage || 1);
       setTotalPages(data.meta?.totalPages || 1);
@@ -557,7 +574,7 @@ export default function AdminProducts({ embedded = false }) {
 
   // ------------------------------------------------------------
   const handleFormSubmit = async (formDataRaw) => {
-    const { nome, marca, preco, descricao, category_id, tamanhos } = formDataRaw;
+    const { nome, marca, preco, descricao, category_id, tamanhos, gender } = formDataRaw;
 
     const nomeValue = nome.trim();
     const marcaValue = marca.trim();
@@ -565,8 +582,9 @@ export default function AdminProducts({ embedded = false }) {
     const descricaoValue = descricao.trim();
     const categoryIdValue = category_id;
     const tamanhosValue = tamanhos.trim();
+    const genderValue = gender || 'Unisexo';
 
-    console.log('📝 VALORES RECEBIDOS DO FORM:', { nomeValue, marcaValue, precoValue, descricaoValue, categoryIdValue, tamanhosValue });
+    console.log('📝 VALORES RECEBIDOS DO FORM:', { nomeValue, marcaValue, precoValue, descricaoValue, categoryIdValue, tamanhosValue, genderValue });
 
     if (!nomeValue || !marcaValue || !precoValue || !categoryIdValue) {
       setError('Nome, marca, preço e categoria são obrigatórios.');
@@ -585,6 +603,7 @@ export default function AdminProducts({ embedded = false }) {
     formData.append('descricao', descricaoValue || '');
     formData.append('category_id', Number(categoryIdValue));
     formData.append('tamanhos', tamanhosValue || '');
+    formData.append('gender', genderValue);
     imageFiles.forEach(file => formData.append('images', file));
 
     try {
@@ -609,6 +628,7 @@ export default function AdminProducts({ embedded = false }) {
           descricao: descricaoValue,
           category_id: categoryIdValue,
           tamanhos: tamanhosValue,
+          gender: genderValue,
           imagesToDelete,
           imagesOrder: newOrder
         });
@@ -651,6 +671,7 @@ export default function AdminProducts({ embedded = false }) {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
+      fetchProducts(newPage);
     }
   };
 
@@ -659,6 +680,7 @@ export default function AdminProducts({ embedded = false }) {
     const page = Number(pageInput);
     if (!isNaN(page) && page >= 1 && page <= totalPages) {
       setCurrentPage(page);
+      fetchProducts(page);
     } else {
       setPageInput(currentPage.toString());
     }
@@ -739,6 +761,7 @@ export default function AdminProducts({ embedded = false }) {
                   <th style={{ padding: 10 }}>Marca</th>
                   <th style={{ padding: 10 }}>Preço</th>
                   <th style={{ padding: 10 }}>Categoria</th>
+                  <th style={{ padding: 10 }}>Género</th>
                   <th style={{ padding: 10 }}></th>
                 </tr>
               </thead>
@@ -767,6 +790,7 @@ export default function AdminProducts({ embedded = false }) {
                       <td style={{ padding: 10 }}>{r.marca}</td>
                       <td style={{ padding: 10, fontWeight: 800 }}>€{r.preco}</td>
                       <td style={{ padding: 10 }}>{r.category_id}</td>
+                      <td style={{ padding: 10 }}>{r.gender || 'Unisexo'}</td>
                       <td style={{ padding: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button className="btn btn-ghost" onClick={() => startEdit(r)}>Editar</button>
                         <button className="btn btn-ghost" onClick={() => openDeleteConfirm(id, r.nome)} style={{ marginLeft: 8 }}>Apagar</button>
@@ -776,13 +800,13 @@ export default function AdminProducts({ embedded = false }) {
                 })}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: 14, color: 'var(--muted)' }}>Sem produtos.</td>
+                    <td colSpan={8} style={{ padding: 14, color: 'var(--muted)' }}>Sem produtos.</td>
                   </tr>
                 )}
               </tbody>
             </table>
 
-            {/* Paginação Admin com input para saltar página */}
+            {/* Paginação */}
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
                 <button
@@ -854,7 +878,7 @@ export default function AdminProducts({ embedded = false }) {
         <ImageModal src={modalImage} alt="Produto" onClose={() => setModalImage(null)} />
       )}
 
-      {/* Modal de confirmação para edição */}
+      {/* Modais (mantidos iguais) */}
       {showConfirmModal && (
         <div
           style={{
@@ -897,7 +921,6 @@ export default function AdminProducts({ embedded = false }) {
         </div>
       )}
 
-      {/* Modal de confirmação para eliminação */}
       {showDeleteModal && (
         <div
           style={{
@@ -940,7 +963,6 @@ export default function AdminProducts({ embedded = false }) {
         </div>
       )}
 
-      {/* Modal de erro ao eliminar (produto com encomendas) - em azul bebé */}
       {showDeleteErrorModal && (
         <div
           style={{
@@ -994,7 +1016,6 @@ export default function AdminProducts({ embedded = false }) {
         </div>
       )}
 
-      {/* Modal de sucesso (criação, edição ou eliminação) */}
       {showSuccessModal && (
         <div
           style={{

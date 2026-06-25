@@ -22,19 +22,18 @@ const upload = multer({
 });
 
 // ========================
-// GET /products – com paginação e filtros
+// GET /products – com paginação e filtros (incluindo gender)
 // ========================
 router.get('/', async (req, res) => {
   try {
-    // Paginação
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 12;
     const offset = (page - 1) * limit;
 
-    // Filtros
     const search = req.query.q ? `%${req.query.q}%` : null;
     const category_id = req.query.category_id ? parseInt(req.query.category_id) : null;
     const brand = req.query.brand || null;
+    const gender = req.query.gender || null;
     const min_price = req.query.min_price ? parseFloat(req.query.min_price) : null;
     const max_price = req.query.max_price ? parseFloat(req.query.max_price) : null;
     const sort = req.query.sort || 'id_desc';
@@ -54,6 +53,10 @@ router.get('/', async (req, res) => {
       sql += ' AND marca = ?';
       params.push(brand);
     }
+    if (gender) {
+      sql += ' AND gender = ?';
+      params.push(gender);
+    }
     if (min_price !== null) {
       sql += ' AND preco >= ?';
       params.push(min_price);
@@ -63,7 +66,6 @@ router.get('/', async (req, res) => {
       params.push(max_price);
     }
 
-    // Ordenação
     switch (sort) {
       case 'name_asc': sql += ' ORDER BY nome ASC'; break;
       case 'name_desc': sql += ' ORDER BY nome DESC'; break;
@@ -72,18 +74,15 @@ router.get('/', async (req, res) => {
       default: sql += ' ORDER BY product_id DESC';
     }
 
-    // Contagem total (sem LIMIT)
     const countSql = sql.replace(/ORDER BY.*$/, '');
     const [countResult] = await db.promise().query(countSql, params);
     const total = countResult.length;
 
-    // Aplicar LIMIT e OFFSET
     sql += ` LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
     const [rows] = await db.promise().query(sql, params);
 
-    // Buscar imagem principal
     for (let product of rows) {
       const [images] = await db.promise().query(
         'SELECT image_url FROM ProductsImages WHERE product_id = ? ORDER BY order_index ASC, is_primary DESC, created_at ASC LIMIT 1',
@@ -110,10 +109,25 @@ router.get('/', async (req, res) => {
 });
 
 // ========================
-// GET /products/search – redireciona para a rota principal com filtros (mantido para compatibilidade)
+// GET /products/brands – lista todas as marcas distintas
+// ========================
+router.get('/brands', async (req, res) => {
+  try {
+    const [rows] = await db.promise().query(
+      'SELECT DISTINCT marca FROM Products WHERE marca IS NOT NULL AND marca != "" ORDER BY marca ASC'
+    );
+    const brands = rows.map(row => row.marca);
+    res.json(brands);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erro ao listar marcas.' });
+  }
+});
+
+// ========================
+// GET /products/search – redireciona para a rota principal
 // ========================
 router.get('/search', async (req, res) => {
-  // Redirecionar para a rota principal com os mesmos parâmetros
   const query = req.query;
   const queryString = new URLSearchParams(query).toString();
   res.redirect(`/products?${queryString}`);
@@ -151,7 +165,7 @@ router.get('/:id', async (req, res) => {
 // POST /products – criar produto
 // ========================
 router.post('/', upload.array('images', 6), async (req, res) => {
-  const { nome, marca, preco, descricao, category_id, tamanhos } = req.body;
+  const { nome, marca, preco, descricao, category_id, tamanhos, gender } = req.body;
   if (!nome || !marca || !preco || !category_id) {
     return res.status(400).json({ message: 'Preenche todos os campos obrigatórios!' });
   }
@@ -161,8 +175,8 @@ router.post('/', upload.array('images', 6), async (req, res) => {
     await connection.beginTransaction();
 
     const [result] = await connection.query(
-      'INSERT INTO Products (nome, marca, preco, descricao, category_id, tamanhos) VALUES (?, ?, ?, ?, ?, ?)',
-      [nome, marca, preco, descricao || null, category_id, tamanhos || null]
+      'INSERT INTO Products (nome, marca, preco, descricao, category_id, tamanhos, gender) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [nome, marca, preco, descricao || null, category_id, tamanhos || null, gender || 'Unisexo']
     );
     const productId = result.insertId;
 
@@ -200,19 +214,19 @@ router.post('/', upload.array('images', 6), async (req, res) => {
 });
 
 // ========================
-// PUT /products/:id – atualizar produto
+// PUT /products/:id – atualizar produto (incluindo gender)
 // ========================
 router.put('/:id', upload.array('newImages', 6), async (req, res) => {
   const { id } = req.params;
-  const { nome, marca, preco, descricao, category_id, tamanhos, imagesToDelete, imagesOrder } = req.body;
+  const { nome, marca, preco, descricao, category_id, tamanhos, imagesToDelete, imagesOrder, gender } = req.body;
 
   const connection = await db.promise().getConnection();
   try {
     await connection.beginTransaction();
 
     await connection.query(
-      'UPDATE Products SET nome = ?, marca = ?, preco = ?, descricao = ?, category_id = ?, tamanhos = ? WHERE product_id = ?',
-      [nome, marca, preco, descricao || null, category_id, tamanhos || null, id]
+      'UPDATE Products SET nome = ?, marca = ?, preco = ?, descricao = ?, category_id = ?, tamanhos = ?, gender = ? WHERE product_id = ?',
+      [nome, marca, preco, descricao || null, category_id, tamanhos || null, gender || 'Unisexo', id]
     );
 
     if (imagesToDelete && imagesToDelete.length) {
