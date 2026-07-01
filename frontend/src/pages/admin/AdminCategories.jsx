@@ -1,6 +1,15 @@
-// AdminCategories.jsx
-// Página de administração de categorias (CRUD completo) com imagens.
+// ================================================================
+// ADMINGATEGORIES.JSX – Gestão de categorias (painel administrativo)
+// ================================================================
+// Este componente permite ao administrador criar, editar e apagar categorias.
+// Inclui:
+// - Pesquisa e ordenação de categorias
+// - Upload de imagem para cada categoria (opcional)
+// - Edição inline com confirmação modal
+// - Eliminação com confirmação modal
+// ================================================================
 
+// Importação dos módulos necessários
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
     getAdminCategories,
@@ -9,20 +18,32 @@ import {
     deleteAdminCategory,
 } from '../../api/admin';
 
+// ================================================================
+// FUNÇÃO AUXILIAR: Verificar chave de administrador
+// ================================================================
+
 function requireAdminKey() {
     const key = localStorage.getItem('admin_key');
     return !!key && key.trim().length > 0;
 }
 
+// ================================================================
+// CONSTANTES
+// ================================================================
+
+// Estado inicial do formulário (vazio)
 const emptyForm = { nome: '', descricao: '', image: null, imagePreview: '' };
 
+// Opções de ordenação
 const SORT_OPTIONS = [
     { value: 'name_asc', label: 'Nome: A → Z' },
     { value: 'name_desc', label: 'Nome: Z → A' },
 ];
 
-// ------------------------------------------------------------
-// Barra de pesquisa
+// ================================================================
+// COMPONENTE: SearchBar (barra de pesquisa e ordenação)
+// ================================================================
+
 const SearchBar = ({ onSearch, onSortChange, sortValue }) => {
     const [localSearch, setLocalSearch] = useState('');
     const debounceTimer = useRef(null);
@@ -30,6 +51,7 @@ const SearchBar = ({ onSearch, onSortChange, sortValue }) => {
     const handleSearchChange = (e) => {
         const value = e.target.value;
         setLocalSearch(value);
+        // Aplica debounce (500ms) para evitar muitas chamadas à API
         if (debounceTimer.current) clearTimeout(debounceTimer.current);
         debounceTimer.current = setTimeout(() => {
             onSearch(value);
@@ -42,6 +64,7 @@ const SearchBar = ({ onSearch, onSortChange, sortValue }) => {
 
     return (
         <div style={{ display: 'flex', gap: '12px', margin: '20px 0', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Campo de pesquisa */}
             <input
                 type="text"
                 value={localSearch}
@@ -50,6 +73,7 @@ const SearchBar = ({ onSearch, onSortChange, sortValue }) => {
                 className="input"
                 style={{ flex: 2, minWidth: '200px' }}
             />
+            {/* Seletor de ordenação */}
             <select
                 value={sortValue}
                 onChange={handleSortChange}
@@ -64,25 +88,28 @@ const SearchBar = ({ onSearch, onSortChange, sortValue }) => {
     );
 };
 
-// ------------------------------------------------------------
-// Componente principal
+// ================================================================
+// COMPONENTE PRINCIPAL: AdminCategories
+// ================================================================
+
 export default function AdminCategories() {
+    // ----- ESTADOS DA LISTA -----
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [sort, setSort] = useState('name_asc');
 
-    // Formulário de criação
+    // ----- FORMULÁRIO DE CRIAÇÃO -----
     const [form, setForm] = useState(emptyForm);
     const [creating, setCreating] = useState(false);
 
-    // Formulário de edição (inline)
+    // ----- FORMULÁRIO DE EDIÇÃO (inline) -----
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState(emptyForm);
     const [savingEdit, setSavingEdit] = useState(false);
 
-    // Modais
+    // ----- MODAIS -----
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [successDetail, setSuccessDetail] = useState('');
@@ -94,9 +121,13 @@ export default function AdminCategories() {
     const [showConfirmEditModal, setShowConfirmEditModal] = useState(false);
     const [editConfirmData, setEditConfirmData] = useState({ id: null, nome: '' });
 
+    // Verifica se o utilizador tem chave de administrador
     const hasKey = useMemo(() => requireAdminKey(), []);
 
-    // ------------------------------------------------------------
+    // ================================================================
+    // FUNÇÕES: Carregar categorias
+    // ================================================================
+
     const load = useCallback(async () => {
         if (!requireAdminKey()) {
             setError('Sem admin key. Vai a /admin/login e define a chave.');
@@ -120,14 +151,20 @@ export default function AdminCategories() {
         }
     }, [searchTerm, sort]);
 
+    // Carrega categorias quando os filtros mudarem
     useEffect(() => {
         load();
     }, [load]);
 
+    // Handlers para pesquisa e ordenação
     const handleSearch = useCallback((term) => setSearchTerm(term), []);
     const handleSortChange = useCallback((newSort) => setSort(newSort), []);
 
-    // ------------------------------------------------------------
+    // ================================================================
+    // FUNÇÕES AUXILIARES
+    // ================================================================
+
+    // Atualiza campos de formulário
     function onChange(setter) {
         return (e) => {
             const { name, value } = e.target;
@@ -135,6 +172,7 @@ export default function AdminCategories() {
         };
     }
 
+    // Manipula a seleção de imagem (cria pré-visualização)
     function onImageChange(setter) {
         return (e) => {
             const file = e.target.files[0];
@@ -151,12 +189,16 @@ export default function AdminCategories() {
         };
     }
 
+    // Validação: nome é obrigatório
     function validateCategory(p) {
         if (!p.nome || !p.nome.trim()) return 'Nome é obrigatório.';
         return '';
     }
 
-    // ------------------------------------------------------------
+    // ================================================================
+    // FUNÇÕES: Modais de sucesso
+    // ================================================================
+
     const showSuccess = (message, detail = '') => {
         setSuccessMessage(message);
         setSuccessDetail(detail);
@@ -165,8 +207,10 @@ export default function AdminCategories() {
 
     const closeSuccessModal = () => setShowSuccessModal(false);
 
-    // ------------------------------------------------------------
-    // ELIMINAÇÃO
+    // ================================================================
+    // FUNÇÕES: Eliminação
+    // ================================================================
+
     const openDeleteConfirm = (id, nome) => {
         setDeleteTargetId(id);
         setDeleteTargetName(nome || '');
@@ -197,8 +241,10 @@ export default function AdminCategories() {
         setDeleteTargetName('');
     };
 
-    // ------------------------------------------------------------
-    // CRIAÇÃO
+    // ================================================================
+    // FUNÇÕES: Criação
+    // ================================================================
+
     async function handleCreate(e) {
         e.preventDefault();
         const msg = validateCategory(form);
@@ -230,8 +276,10 @@ export default function AdminCategories() {
         }
     }
 
-    // ------------------------------------------------------------
-    // EDIÇÃO
+    // ================================================================
+    // FUNÇÕES: Edição
+    // ================================================================
+
     function startEdit(row) {
         setEditingId(row.category_id);
         setEditForm({
@@ -248,13 +296,13 @@ export default function AdminCategories() {
         setSavingEdit(false);
     }
 
-    // Abre o modal de confirmação com os dados atuais
+    // Abre o modal de confirmação de edição
     const openConfirmEdit = (id, nome) => {
         setEditConfirmData({ id, nome });
         setShowConfirmEditModal(true);
     };
 
-    // Confirmar edição – chama a função que guarda
+    // Confirma a edição
     const confirmEdit = async () => {
         const id = editConfirmData.id;
         setShowConfirmEditModal(false);
@@ -272,7 +320,7 @@ export default function AdminCategories() {
         setEditConfirmData({ id: null, nome: '' });
     };
 
-    // Função que efetivamente guarda a edição
+    // Função que guarda a edição
     const performSaveEdit = async (id) => {
         const msg = validateCategory(editForm);
         if (msg) {
@@ -318,28 +366,15 @@ export default function AdminCategories() {
         openConfirmEdit(id, nome);
     };
 
-    // ------------------------------------------------------------
-    if (!hasKey) {
-        return (
-            <div className="container" style={{ padding: '32px 0' }}>
-                <h1>Admin • Categorias</h1>
-                <p style={{ color: 'salmon' }}>
-                    Sem admin key. Vai a <strong>/admin/login</strong> e define a chave.
-                </p>
-            </div>
-        );
-    }
+    // ================================================================
+    // FUNÇÃO: Tratar erro de imagem (fallback para ícone)
+    // ================================================================
 
-    // Função segura para tratar erro de imagem
     const handleImageError = (e) => {
         const img = e.currentTarget;
-        // Verifica se o elemento ainda está no DOM e tem pai
         if (img && img.parentNode) {
-            // Substitui a imagem por um ícone 📁
             const parent = img.parentNode;
-            // Remove a imagem
             img.style.display = 'none';
-            // Adiciona um span com o ícone
             const icon = document.createElement('span');
             icon.textContent = '📁';
             icon.style.fontSize = '28px';
@@ -352,8 +387,28 @@ export default function AdminCategories() {
         }
     };
 
+    // ================================================================
+    // RENDERIZAÇÃO CONDICIONAL (sem chave admin)
+    // ================================================================
+
+    if (!hasKey) {
+        return (
+            <div className="container" style={{ padding: '32px 0' }}>
+                <h1>Admin • Categorias</h1>
+                <p style={{ color: 'salmon' }}>
+                    Sem admin key. Vai a <strong>/admin/login</strong> e define a chave.
+                </p>
+            </div>
+        );
+    }
+
+    // ================================================================
+    // RENDERIZAÇÃO PRINCIPAL
+    // ================================================================
+
     return (
         <div className="container" style={{ padding: '32px 0' }}>
+            {/* Cabeçalho */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                     <h1 style={{ margin: 0 }}>Admin • Categorias</h1>
@@ -364,12 +419,14 @@ export default function AdminCategories() {
                 </button>
             </div>
 
+            {/* Barra de pesquisa e ordenação */}
             <SearchBar
                 onSearch={handleSearch}
                 onSortChange={handleSortChange}
                 sortValue={sort}
             />
 
+            {/* Mensagem de erro */}
             {error && <p style={{ color: 'salmon', marginTop: 16 }}>{error}</p>}
 
             {/* Formulário de criação */}
@@ -401,7 +458,7 @@ export default function AdminCategories() {
                 </form>
             </div>
 
-            {/* Lista de categorias */}
+            {/* Lista de categorias (tabela) */}
             <div className="card" style={{ padding: 12, marginTop: 16, overflowX: 'auto' }}>
                 {loading ? (
                     <p style={{ color: 'var(--muted)' }}>A carregar...</p>
@@ -424,6 +481,7 @@ export default function AdminCategories() {
                                     <tr key={r.category_id} style={{ borderTop: '1px solid var(--border)' }}>
                                         <td style={{ padding: 10 }}>
                                             {isEditing ? (
+                                                // Modo de edição: input para imagem
                                                 <>
                                                     <input
                                                         type="file"
@@ -443,6 +501,7 @@ export default function AdminCategories() {
                                                     )}
                                                 </>
                                             ) : (
+                                                // Modo de visualização: mostra a imagem ou ícone
                                                 <div
                                                     style={{
                                                         width: 56,
@@ -506,7 +565,11 @@ export default function AdminCategories() {
                 )}
             </div>
 
-            {/* Modais */}
+            {/* ================================================================ */}
+            {/* MODAIS */}
+            {/* ================================================================ */}
+
+            {/* Modal de sucesso */}
             {showSuccessModal && (
                 <div
                     style={{
@@ -558,6 +621,7 @@ export default function AdminCategories() {
                 </div>
             )}
 
+            {/* Modal de confirmação de eliminação */}
             {showDeleteModal && (
                 <div
                     style={{
@@ -600,6 +664,7 @@ export default function AdminCategories() {
                 </div>
             )}
 
+            {/* Modal de confirmação de edição */}
             {showConfirmEditModal && (
                 <div
                     style={{

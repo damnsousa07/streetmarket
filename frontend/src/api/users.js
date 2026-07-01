@@ -1,25 +1,46 @@
-// auth.js
-// Serviço de autenticação (login, registo) – frontend.
-// Comunica com a API de autenticação do backend.
+// ================================================================
+// AUTH.JS – Serviço de autenticação (frontend)
+// ================================================================
+// Este ficheiro contém as funções para login e registo de utilizadores.
+// Comunica com as rotas de autenticação do backend (/users).
+// Utiliza o cliente HTTP (Axios) configurado em client.js.
+// ================================================================
 
+// Importação do cliente HTTP (Axios) configurado
 import { api } from './client';
 
-// ------------------------------------------------------------
-// LOGIN
-// Envia email e password para o backend.
-// Retorna os dados do utilizador (se autenticado).
+// ================================================================
+// FUNÇÃO: Login
+// ================================================================
+
+// POST /users/login – Autentica o utilizador
+// Parâmetros:
+//   email - Email do utilizador
+//   password - Password do utilizador
+// Retorna: { user_id, nome, email, tipo }
 export async function loginUser(email, password) {
-    // Faz POST para /users/login com as credenciais
+    // Faz a requisição POST para /users/login
     const res = await api.post('/users/login', { email, password });
-    return res.data; // { user_id, nome, email, tipo }
+    return res.data;
 }
 
-// ------------------------------------------------------------
-// REGISTO (com todos os campos obrigatórios)
-// Envia os dados necessários para criar uma conta.
-// O backend exige: primeiro_nome, ultimo_nome, email, password,
-// morada, codigo_postal, telefone, distrito, concelho.
-// Retorna a mensagem de sucesso (código de verificação enviado).
+// ================================================================
+// FUNÇÃO: Registo de novo utilizador
+// ================================================================
+
+// POST /users/register – Cria uma nova conta
+// Todos os campos são obrigatórios.
+// Após o registo, é enviado um código de verificação por email.
+// Parâmetros:
+//   primeiro_nome - Primeiro nome do utilizador
+//   ultimo_nome - Último nome do utilizador
+//   email - Email do utilizador (único)
+//   password - Password (mínimo 8 caracteres)
+//   morada - Morada completa
+//   codigo_postal - Código postal (formato XXXX-XXX)
+//   telefone - Número de telefone (9 dígitos, começa por 9)
+//   distrito - Distrito de residência
+//   concelho - Concelho de residência
 export async function registerUser({
     primeiro_nome,
     ultimo_nome,
@@ -44,7 +65,7 @@ export async function registerUser({
         concelho: concelho.trim()
     };
 
-    // Faz POST para /users/register
+    // Faz a requisição POST para /users/register
     const res = await api.post('/users/register', payload);
     return res.data; // { message: 'Registo efetuado! Verifica o teu email...' }
 }

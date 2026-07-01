@@ -1,31 +1,48 @@
-// AdminPanel.jsx
-// Painel de administração com links para as secções de gestão (encomendas, produtos, categorias, notificações).
+// ================================================================
+// ADMINPANEL.JSX – Painel de administração (dashboard)
+// ================================================================
+// Este componente é a página principal do painel administrativo.
+// Exibe links para as diferentes secções de gestão:
+// - Encomendas
+// - Produtos
+// - Categorias
+// - Notificações
 // Inclui verificação de chave de administrador e funcionalidade de logout.
+// ================================================================
 
+// Importação dos módulos necessários
 import { Link, useNavigate } from 'react-router-dom';
 
-// Função que verifica se existe uma chave de administrador válida no localStorage
+// ================================================================
+// FUNÇÃO AUXILIAR: Verificar chave de administrador
+// ================================================================
+
 function requireAdminKey() {
     const key = localStorage.getItem('admin_key');
     return !!key && key.trim().length > 0;
 }
 
+// ================================================================
+// COMPONENTE: AdminPanel
+// ================================================================
+
 export default function AdminPanel() {
     const navigate = useNavigate();
 
+    // ----- VERIFICAÇÃO DE AUTENTICAÇÃO -----
     // Se não houver chave de administrador, redireciona para a página de login admin
     if (!requireAdminKey()) {
         navigate('/admin/login', { replace: true });
         return null; // Não renderiza nada enquanto redireciona
     }
 
-    // Função para terminar a sessão de administrador
+    // ----- FUNÇÃO: Logout (terminar sessão admin) -----
     function logout() {
         localStorage.removeItem('admin_key'); // Remove a chave do localStorage
         navigate('/', { replace: true });     // Redireciona para a página inicial
     }
 
-    // Estilos reutilizáveis para os botões/links do painel
+    // ----- ESTILOS REUTILIZÁVEIS -----
     const btnStyle = {
         width: '100%',
         maxWidth: 360,
@@ -36,6 +53,7 @@ export default function AdminPanel() {
         textAlign: 'center',
     };
 
+    // ----- RENDERIZAÇÃO -----
     return (
         <div className="container" style={{ padding: '32px 0' }}>
             {/* Container centralizado verticalmente */}
@@ -55,18 +73,22 @@ export default function AdminPanel() {
 
                     {/* Links para as secções de administração */}
                     <div style={{ display: 'grid', gap: 12, marginTop: 18, justifyItems: 'center' }}>
+                        {/* Link para gestão de encomendas */}
                         <Link className="btn btn-primary" style={btnStyle} to="/admin/orders">
                             Encomendas
                         </Link>
 
+                        {/* Link para gestão de produtos */}
                         <Link className="btn btn-primary" style={btnStyle} to="/admin/products">
                             Produtos
                         </Link>
 
+                        {/* Link para gestão de categorias */}
                         <Link className="btn btn-primary" style={btnStyle} to="/admin/categories">
                             Categorias
                         </Link>
 
+                        {/* Link para gestão de notificações */}
                         <Link className="btn btn-primary" style={btnStyle} to="/admin/notifications">
                             Notificações
                         </Link>

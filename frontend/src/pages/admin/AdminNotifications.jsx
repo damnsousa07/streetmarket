@@ -1,8 +1,21 @@
-// AdminNotifications.jsx
-// Página de administração de notificações com filtros, pesquisa e ordenação.
+// ================================================================
+// ADMINNOTIFICATIONS.JSX – Gestão de notificações (painel admin)
+// ================================================================
+// Este componente permite ao administrador visualizar as notificações
+// do sistema com filtros por:
+// - Pesquisa (conteúdo, utilizador ou email)
+// - Tipo de notificação (Encomenda, Review, Admin)
+// - Ordenação (data ou tipo)
+// Limite máximo: 200 notificações (definido no backend)
+// ================================================================
 
+// Importação dos módulos necessários
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getAdminNotifications } from '../../api/admin';
+
+// ================================================================
+// CONSTANTES
+// ================================================================
 
 // Opções de filtro por tipo de notificação
 const TYPE_OPTIONS = [
@@ -20,13 +33,20 @@ const SORT_OPTIONS = [
   { value: 'type_desc', label: 'Tipo: Z → A' },
 ];
 
-// Verifica se a chave de administrador está definida
+// ================================================================
+// FUNÇÃO AUXILIAR: Verificar chave de administrador
+// ================================================================
+
 function requireAdminKey() {
   const key = localStorage.getItem('admin_key');
   return !!key && key.trim().length > 0;
 }
 
-// Componente que exibe um badge colorido consoante o tipo de notificação
+// ================================================================
+// COMPONENTE: TypeBadge (badge colorido para o tipo de notificação)
+// ================================================================
+
+// Exibe um badge com cor diferente consoante o tipo de notificação
 function TypeBadge({ tipo }) {
   const t = (tipo || '').toLowerCase();
 
@@ -36,13 +56,13 @@ function TypeBadge({ tipo }) {
 
   // Define cores específicas para cada tipo
   if (t.includes('encom')) {
-    bg = 'rgba(37, 99, 235, 0.18)';
+    bg = 'rgba(37, 99, 235, 0.18)';      // Azul para encomendas
     border = 'rgba(37, 99, 235, 0.35)';
   } else if (t.includes('review')) {
-    bg = 'rgba(34, 197, 94, 0.18)';
+    bg = 'rgba(34, 197, 94, 0.18)';      // Verde para reviews
     border = 'rgba(34, 197, 94, 0.35)';
   } else if (t.includes('admin')) {
-    bg = 'rgba(245, 158, 11, 0.18)';
+    bg = 'rgba(245, 158, 11, 0.18)';     // Amarelo para admin
     border = 'rgba(245, 158, 11, 0.35)';
   }
 
@@ -64,26 +84,33 @@ function TypeBadge({ tipo }) {
   );
 }
 
-// Componente principal
+// ================================================================
+// COMPONENTE PRINCIPAL: AdminNotifications
+// ================================================================
+
 export default function AdminNotifications() {
-  // Estados para a lista, carregamento e erro
+  // ----- ESTADOS DA LISTA -----
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Estado dos filtros (pesquisa, tipo, ordenação)
+  // ----- ESTADO DOS FILTROS -----
   const [filters, setFilters] = useState({
     search: '',
     type: '',
     sort: 'date_desc',
   });
 
-  // Referências para o campo de pesquisa e para o timer do debounce
+  // ----- REFERÊNCIAS -----
   const searchInputRef = useRef(null);
   const debounceTimer = useRef(null);
 
-  // Função que busca as notificações na API com os filtros atuais
+  // ================================================================
+  // FUNÇÃO: Buscar notificações
+  // ================================================================
+
   const fetchNotifications = useCallback(async (search, type, sort) => {
+    // Verifica se tem chave de administrador
     if (!requireAdminKey()) {
       setError('Sem admin key.');
       setLoading(false);
@@ -91,10 +118,12 @@ export default function AdminNotifications() {
     }
     try {
       setLoading(true);
+      // Constrói os parâmetros da query string
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (type) params.append('type', type);
       if (sort) params.append('sort', sort);
+      // Chama a API
       const data = await getAdminNotifications(params.toString());
       setItems(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -105,19 +134,28 @@ export default function AdminNotifications() {
     }
   }, []);
 
+  // ================================================================
+  // EFFECTS: Carregar dados
+  // ================================================================
+
   // Carrega as notificações iniciais (sem filtros) ao montar
   useEffect(() => {
     fetchNotifications('', '', 'date_desc');
   }, [fetchNotifications]);
 
-  // Quando os filtros mudam, recarrega os dados
+  // Quando os filtros mudarem, recarrega os dados
   useEffect(() => {
     fetchNotifications(filters.search, filters.type, filters.sort);
   }, [filters, fetchNotifications]);
 
+  // ================================================================
+  // HANDLERS: Filtros
+  // ================================================================
+
   // Handler para pesquisa com debounce (500ms)
   const handleSearchChange = () => {
     const value = searchInputRef.current?.value || '';
+    // Limpa o timer anterior para evitar chamadas desnecessárias
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       setFilters(prev => ({ ...prev, search: value }));
@@ -139,7 +177,10 @@ export default function AdminNotifications() {
     fetchNotifications(currentSearch, currentType, currentSort);
   };
 
-  // Se não houver chave de admin, mostra aviso
+  // ================================================================
+  // RENDERIZAÇÃO CONDICIONAL (sem chave admin)
+  // ================================================================
+
   if (!requireAdminKey()) {
     return (
       <div className="container" style={{ padding: '32px 0' }}>
@@ -151,7 +192,10 @@ export default function AdminNotifications() {
     );
   }
 
-  // Renderização principal
+  // ================================================================
+  // RENDERIZAÇÃO PRINCIPAL
+  // ================================================================
+
   return (
     <div className="container" style={{ padding: '32px 0' }}>
       {/* Cabeçalho com título e botão de atualizar */}
@@ -162,15 +206,14 @@ export default function AdminNotifications() {
             Últimas notificações do sistema (até 200).
           </p>
         </div>
-        <div>
-          <button className="btn btn-primary" onClick={handleRefresh} disabled={loading}>
-            Atualizar
-          </button>
-        </div>
+        <button className="btn btn-primary" onClick={handleRefresh} disabled={loading}>
+          Atualizar
+        </button>
       </div>
 
       {/* Barra de filtros */}
       <div style={{ display: 'flex', gap: '12px', margin: '20px 0', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* Pesquisa por texto */}
         <input
           type="text"
           ref={searchInputRef}
@@ -180,6 +223,8 @@ export default function AdminNotifications() {
           className="input"
           style={{ flex: 2, minWidth: '200px' }}
         />
+
+        {/* Seletor de tipo de notificação */}
         <select
           name="type"
           value={filters.type}
@@ -191,6 +236,8 @@ export default function AdminNotifications() {
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
+
+        {/* Seletor de ordenação */}
         <select
           name="sort"
           value={filters.sort}
@@ -225,12 +272,15 @@ export default function AdminNotifications() {
               {/* Linha superior: badge + info do utilizador + data */}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Badge do tipo */}
                   <TypeBadge tipo={n.tipo} />
+                  {/* Informação do utilizador */}
                   <div style={{ color: 'var(--muted)', fontSize: 13 }}>
                     User: <strong>{n.user_id}</strong> {n.user_nome ? `• ${n.user_nome}` : ''}{' '}
                     {n.email ? `• ${n.email}` : ''}
                   </div>
                 </div>
+                {/* Data da notificação */}
                 <div style={{ color: 'var(--muted)', fontSize: 13 }}>
                   {n.data_envio ? new Date(n.data_envio).toLocaleString() : ''}
                 </div>

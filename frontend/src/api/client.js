@@ -1,6 +1,10 @@
-// client.js
-// Configuração do cliente HTTP (Axios) para comunicar com a API.
-// Utiliza a variável de ambiente VITE_API_URL para definir a base URL.
+// ================================================================
+// CLIENT.JS – Configuração do cliente HTTP (Axios)
+// ================================================================
+// Este ficheiro configura a instância do Axios que será utilizada
+// para todas as chamadas à API.
+// A baseURL é definida a partir da variável de ambiente VITE_API_URL.
+// ================================================================
 
 import axios from 'axios';
 
@@ -12,4 +16,4 @@ export const api = axios.create({
 });
 
 // A partir daqui, podes usar 'api' para fazer pedidos GET, POST, PUT, DELETE, etc.
-// Exemplo: api.get('/Products') -> faz GET para VITE_API_URL + '/Products'
+// Exemplo: api.get('/Products') -> faz GET para VITE_API_URL + '/Products'a

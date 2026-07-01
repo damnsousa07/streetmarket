@@ -1,4 +1,16 @@
-// AdminProducts.jsx
+// ================================================================
+// ADMINPRODUCTS.JSX – Gestão de produtos (painel administrativo)
+// ================================================================
+// Este componente permite ao administrador gerir produtos:
+// - Listagem com paginação (12 produtos por página)
+// - Pesquisa e filtros (categoria, marca, preço, género)
+// - Criação de novos produtos (com imagens, stock, género)
+// - Edição inline com confirmação modal
+// - Eliminação com confirmação modal
+// - Gestão de imagens (arrastar/reordenar, adicionar/remover)
+// ================================================================
+
+// Importação dos módulos necessários
 import { useEffect, useMemo, useState, useRef, useCallback, memo } from 'react';
 import { api } from '../../api/client';
 import {
@@ -11,11 +23,20 @@ import {
 } from '../../api/admin';
 import ImageModal from '../../components/ImageModal';
 
+// ================================================================
+// FUNÇÃO AUXILIAR: Verificar chave de administrador
+// ================================================================
+
 function requireAdminKey() {
   const key = localStorage.getItem('admin_key');
   return !!key && key.trim().length > 0;
 }
 
+// ================================================================
+// CONSTANTES
+// ================================================================
+
+// Opções de ordenação disponíveis para a lista de produtos
 const SORT_OPTIONS = [
   { value: 'id_desc', label: 'ID: mais recente primeiro' },
   { value: 'id_asc', label: 'ID: mais antigo primeiro' },
@@ -25,14 +46,20 @@ const SORT_OPTIONS = [
   { value: 'price_desc', label: 'Preço: maior → menor' },
 ];
 
+// ================================================================
+// COMPONENTE: SearchBar (barra de pesquisa e filtros)
+// ================================================================
+
 const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands }) => {
   const [localSearch, setLocalSearch] = useState(filters.search || '');
   const debounceTimer = useRef(null);
 
+  // Sincroniza o estado local com o filtro de pesquisa (quando muda externamente)
   useEffect(() => {
     setLocalSearch(filters.search || '');
   }, [filters.search]);
 
+  // Handler para pesquisa com debounce (500ms)
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setLocalSearch(value);
@@ -44,6 +71,7 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
 
   return (
     <div style={{ display: 'flex', gap: '12px', margin: '20px 0', flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Campo de pesquisa por nome ou marca */}
       <input
         type="text"
         value={localSearch}
@@ -52,6 +80,7 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
         className="input"
         style={{ flex: 2, minWidth: '200px' }}
       />
+      {/* Filtro por categoria */}
       <select
         name="category_id"
         value={filters.category_id}
@@ -64,6 +93,7 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
           <option key={cat.category_id} value={cat.category_id}>{cat.nome}</option>
         ))}
       </select>
+      {/* Filtro por marca */}
       <select
         name="brand"
         value={filters.brand}
@@ -76,6 +106,7 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
           <option key={brand} value={brand}>{brand}</option>
         ))}
       </select>
+      {/* Preço mínimo */}
       <input
         type="number"
         name="min_price"
@@ -85,6 +116,7 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
         className="input"
         style={{ width: '120px' }}
       />
+      {/* Preço máximo */}
       <input
         type="number"
         name="max_price"
@@ -94,6 +126,7 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
         className="input"
         style={{ width: '120px' }}
       />
+      {/* Ordenação */}
       <select
         name="sort"
         value={filters.sort}
@@ -109,6 +142,12 @@ const SearchBar = memo(({ onSearch, onFilterChange, filters, categories, brands 
   );
 });
 
+// ================================================================
+// COMPONENTE: ProductForm (formulário de criação/edição)
+// ================================================================
+
+// Formulário isolado e memoizado para evitar re-renderizações desnecessárias
+// Utiliza refs para ler os valores apenas no submit (mantém o foco)
 const ProductForm = memo(({
   editingProduct,
   categories,
@@ -124,6 +163,7 @@ const ProductForm = memo(({
   removeExistingImage,
   setModalImage,
 }) => {
+  // REFS para os campos do formulário
   const nomeRef = useRef(null);
   const marcaRef = useRef(null);
   const precoRef = useRef(null);
@@ -133,6 +173,7 @@ const ProductForm = memo(({
   const genderRef = useRef(null);
   const stockRef = useRef(null);
 
+  // Submissão do formulário: lê valores das refs e pede confirmação
   const handleSubmit = (e) => {
     e.preventDefault();
     const data = {
@@ -154,14 +195,17 @@ const ProductForm = memo(({
         {editingProduct ? '✏️ Editar produto' : '➕ Criar produto'}
       </div>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {/* Nome (obrigatório) */}
         <div>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Nome *</label>
           <input className="input" name="nome" ref={nomeRef} defaultValue={editingProduct?.nome || ''} required />
         </div>
+        {/* Marca (obrigatório) */}
         <div>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Marca *</label>
           <input className="input" name="marca" ref={marcaRef} defaultValue={editingProduct?.marca || ''} required />
         </div>
+        {/* Preço (obrigatório) */}
         <div>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Preço (€) *</label>
           <input
@@ -174,6 +218,7 @@ const ProductForm = memo(({
             placeholder="Ex: 99.99"
           />
         </div>
+        {/* Categoria (obrigatório) */}
         <div>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Categoria *</label>
           <select
@@ -190,6 +235,7 @@ const ProductForm = memo(({
             ))}
           </select>
         </div>
+        {/* Género */}
         <div>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Género</label>
           <select
@@ -203,6 +249,7 @@ const ProductForm = memo(({
             <option value="Unisexo">Unisexo</option>
           </select>
         </div>
+        {/* Stock */}
         <div>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Stock</label>
           <input
@@ -214,6 +261,7 @@ const ProductForm = memo(({
             min="0"
           />
         </div>
+        {/* Tamanhos */}
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Tamanhos (separados por vírgula)</label>
           <input
@@ -225,6 +273,7 @@ const ProductForm = memo(({
           />
         </div>
 
+        {/* Gestão de imagens existentes (apenas em modo edição) */}
         {editingProduct && existingImages.length > 0 && (
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
@@ -297,6 +346,7 @@ const ProductForm = memo(({
           </div>
         )}
 
+        {/* Upload de novas imagens */}
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
             {editingProduct ? 'Adicionar novas imagens (opcional, até 6)' : 'Imagens (até 6)'}
@@ -311,11 +361,13 @@ const ProductForm = memo(({
           )}
         </div>
 
+        {/* Descrição */}
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Descrição</label>
           <input className="input" name="descricao" ref={descricaoRef} defaultValue={editingProduct?.descricao || ''} />
         </div>
 
+        {/* Botões de ação */}
         <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
           {editingProduct && (
             <button type="button" className="btn btn-ghost" onClick={onCancel}>
@@ -331,7 +383,12 @@ const ProductForm = memo(({
   );
 });
 
+// ================================================================
+// COMPONENTE PRINCIPAL: AdminProducts
+// ================================================================
+
 export default function AdminProducts({ embedded = false }) {
+  // ----- ESTADOS DA LISTA -----
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -339,6 +396,7 @@ export default function AdminProducts({ embedded = false }) {
   const [loadingCats, setLoadingCats] = useState(true);
   const [error, setError] = useState('');
 
+  // ----- ESTADO DOS FILTROS -----
   const [filters, setFilters] = useState({
     search: '',
     category_id: '',
@@ -348,21 +406,26 @@ export default function AdminProducts({ embedded = false }) {
     sort: 'id_desc',
   });
 
+  // ----- ESTADOS DE PAGINAÇÃO -----
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageInput, setPageInput] = useState('');
-  const limit = 12;
+  const limit = 12; // Produtos por página
 
+  // ----- ESTADOS DE EDIÇÃO -----
   const [editingProduct, setEditingProduct] = useState(null);
   const [existingImages, setExistingImages] = useState([]);
   const [modalImage, setModalImage] = useState(null);
 
+  // ----- ESTADOS DE IMAGEM -----
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
+  // ----- ESTADO DE CONFIRMAÇÃO -----
   const [pendingFormData, setPendingFormData] = useState(null);
 
+  // ----- MODAIS -----
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -377,7 +440,12 @@ export default function AdminProducts({ embedded = false }) {
     isDelete: false,
   });
 
+  // Verifica se o utilizador tem chave de administrador
   const hasKey = useMemo(() => requireAdminKey(), []);
+
+  // ================================================================
+  // FUNÇÃO: Buscar produtos (com paginação e filtros)
+  // ================================================================
 
   const fetchProducts = useCallback(async (page = currentPage) => {
     if (!requireAdminKey()) {
@@ -387,6 +455,7 @@ export default function AdminProducts({ embedded = false }) {
     }
     try {
       setLoading(true);
+      // Constrói os parâmetros da query string
       const params = new URLSearchParams();
       if (filters.search) params.append('search', filters.search);
       if (filters.category_id) params.append('category_id', filters.category_id);
@@ -396,6 +465,7 @@ export default function AdminProducts({ embedded = false }) {
       if (filters.sort) params.append('sort', filters.sort);
       params.append('page', page);
       params.append('limit', limit);
+      // Chama a API
       const data = await getAdminProducts(params.toString());
       setRows(data.data || []);
       setCurrentPage(data.meta?.currentPage || 1);
@@ -410,9 +480,14 @@ export default function AdminProducts({ embedded = false }) {
     }
   }, [filters, currentPage]);
 
+  // Carrega produtos inicialmente e quando os filtros mudarem
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  // ================================================================
+  // FUNÇÕES: Carregar categorias e marcas
+  // ================================================================
 
   async function loadCategories() {
     if (!requireAdminKey()) {
@@ -444,26 +519,36 @@ export default function AdminProducts({ embedded = false }) {
     }
   }
 
+  // Carrega categorias e marcas ao montar
   useEffect(() => {
     loadCategories();
     loadBrands();
   }, []);
 
+  // ================================================================
+  // HANDLERS: Filtros e pesquisa
+  // ================================================================
+
   const handleSearch = useCallback((searchValue) => {
     setFilters(prev => ({ ...prev, search: searchValue }));
-    setCurrentPage(1);
+    setCurrentPage(1); // Reset para a primeira página ao pesquisar
   }, []);
 
   const handleFilterChange = useCallback((e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
-    setCurrentPage(1);
+    setCurrentPage(1); // Reset para a primeira página ao filtrar
   }, []);
 
   const handleRefresh = () => {
     fetchProducts(currentPage);
   };
 
+  // ================================================================
+  // FUNÇÕES: Edição de produtos
+  // ================================================================
+
+  // Inicia a edição de um produto (carrega os dados completos)
   async function startEdit(product) {
     try {
       const productId = product.product_id ?? product.Product_id;
@@ -484,6 +569,7 @@ export default function AdminProducts({ embedded = false }) {
     }
   }
 
+  // Cancela o modo de edição
   function cancelEdit() {
     setEditingProduct(null);
     setExistingImages([]);
@@ -492,6 +578,11 @@ export default function AdminProducts({ embedded = false }) {
     setPendingFormData(null);
   }
 
+  // ================================================================
+  // FUNÇÕES: Imagens
+  // ================================================================
+
+  // Atualiza as imagens selecionadas para upload
   function handleImageChange(e) {
     const files = Array.from(e.target.files);
     setImageFiles(files);
@@ -499,15 +590,22 @@ export default function AdminProducts({ embedded = false }) {
     setPreviewUrls(urls);
   }
 
+  // Remove uma imagem existente (apenas do estado, não do disco)
   function removeExistingImage(imageId) {
     setExistingImages(prev => prev.filter(img => img.image_id !== imageId));
   }
 
+  // ================================================================
+  // FUNÇÕES: Modais de confirmação
+  // ================================================================
+
+  // Abre o modal de confirmação de edição
   const onRequestConfirm = (formData) => {
     setPendingFormData(formData);
     setShowConfirmModal(true);
   };
 
+  // Confirma a edição (chama a API)
   const confirmEdit = async () => {
     setShowConfirmModal(false);
     if (pendingFormData) {
@@ -516,10 +614,15 @@ export default function AdminProducts({ embedded = false }) {
     }
   };
 
+  // Cancela a edição a partir do modal
   const cancelConfirm = () => {
     setShowConfirmModal(false);
     setPendingFormData(null);
   };
+
+  // ================================================================
+  // FUNÇÕES: Eliminação de produtos
+  // ================================================================
 
   const openDeleteConfirm = (id, nome) => {
     setDeleteTargetId(id);
@@ -552,6 +655,7 @@ export default function AdminProducts({ embedded = false }) {
       const errno = data.errno ?? e.errno ?? null;
       const sqlMessage = data.sqlMessage ?? data.message ?? e.sqlMessage ?? '';
 
+      // Erro 1451 = foreign key constraint (produto tem encomendas)
       if (errno === 1451 || sqlMessage.toLowerCase().includes('foreign key constraint') || sqlMessage.includes('Cannot delete')) {
         setShowDeleteErrorModal(true);
       } else {
@@ -573,6 +677,10 @@ export default function AdminProducts({ embedded = false }) {
 
   const closeDeleteErrorModal = () => setShowDeleteErrorModal(false);
 
+  // ================================================================
+  // FUNÇÃO: Submeter formulário (criação ou edição)
+  // ================================================================
+
   const handleFormSubmit = async (formDataRaw) => {
     const { nome, marca, preco, descricao, category_id, tamanhos, gender, stock } = formDataRaw;
 
@@ -587,6 +695,7 @@ export default function AdminProducts({ embedded = false }) {
 
     console.log('📝 VALORES RECEBIDOS DO FORM:', { nomeValue, marcaValue, precoValue, descricaoValue, categoryIdValue, tamanhosValue, genderValue, stockValue });
 
+    // Validação dos campos obrigatórios
     if (!nomeValue || !marcaValue || !precoValue || !categoryIdValue) {
       setError('Nome, marca, preço e categoria são obrigatórios.');
       return;
@@ -597,6 +706,7 @@ export default function AdminProducts({ embedded = false }) {
       return;
     }
 
+    // Prepara o FormData (para upload de imagens)
     const formData = new FormData();
     formData.append('nome', nomeValue);
     formData.append('marca', marcaValue);
@@ -613,6 +723,7 @@ export default function AdminProducts({ embedded = false }) {
       setError('');
 
       if (editingProduct) {
+        // Modo edição
         const productId = editingProduct.product_id ?? editingProduct.Product_id;
         const originalIds = (editingProduct.images || []).map(img => img.image_id);
         const currentIds = existingImages.map(img => img.image_id);
@@ -647,6 +758,7 @@ export default function AdminProducts({ embedded = false }) {
         setShowSuccessModal(true);
         cancelEdit();
       } else {
+        // Modo criação
         await createAdminProduct(formData);
         setSuccessData({
           nome: nomeValue,
@@ -668,7 +780,9 @@ export default function AdminProducts({ embedded = false }) {
     }
   };
 
-  const closeSuccessModal = () => setShowSuccessModal(false);
+  // ================================================================
+  // HANDLERS: Paginação
+  // ================================================================
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -696,8 +810,16 @@ export default function AdminProducts({ embedded = false }) {
     return pages;
   };
 
+  // ================================================================
+  // COMPONENTE Wrapper (para embedding)
+  // ================================================================
+
   const Wrapper = ({ children }) =>
     embedded ? <div>{children}</div> : <div className="container" style={{ padding: '32px 0' }}>{children}</div>;
+
+  // ================================================================
+  // RENDERIZAÇÃO CONDICIONAL (sem chave admin)
+  // ================================================================
 
   if (!hasKey) {
     return (
@@ -708,8 +830,13 @@ export default function AdminProducts({ embedded = false }) {
     );
   }
 
+  // ================================================================
+  // RENDERIZAÇÃO PRINCIPAL
+  // ================================================================
+
   return (
     <Wrapper>
+      {/* ----- CABEÇALHO ----- */}
       {!embedded && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
           <div>
@@ -722,8 +849,10 @@ export default function AdminProducts({ embedded = false }) {
         </div>
       )}
 
+      {/* Mensagem de erro */}
       {error && <p style={{ color: 'salmon', marginTop: 16 }}>{error}</p>}
 
+      {/* Barra de pesquisa e filtros */}
       <SearchBar
         onSearch={handleSearch}
         onFilterChange={handleFilterChange}
@@ -732,6 +861,7 @@ export default function AdminProducts({ embedded = false }) {
         brands={brands}
       />
 
+      {/* Formulário de criação/edição */}
       <ProductForm
         editingProduct={editingProduct}
         categories={categories}
@@ -748,6 +878,7 @@ export default function AdminProducts({ embedded = false }) {
         setModalImage={setModalImage}
       />
 
+      {/* ----- LISTA DE PRODUTOS (tabela com paginação) ----- */}
       <div className="card" style={{ padding: 12, marginTop: 16, overflowX: 'auto' }}>
         {loading ? (
           <p style={{ color: 'var(--muted)' }}>A carregar...</p>
@@ -809,8 +940,10 @@ export default function AdminProducts({ embedded = false }) {
               </tbody>
             </table>
 
+            {/* Paginação */}
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '20px', flexWrap: 'wrap' }}>
+                {/* Botão Anterior */}
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
@@ -819,6 +952,7 @@ export default function AdminProducts({ embedded = false }) {
                 >
                   Anterior
                 </button>
+                {/* Números das páginas */}
                 {getPageNumbers().map(num => (
                   <button
                     key={num}
@@ -835,6 +969,7 @@ export default function AdminProducts({ embedded = false }) {
                     {num}
                   </button>
                 ))}
+                {/* Botão Próximo */}
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
@@ -844,6 +979,7 @@ export default function AdminProducts({ embedded = false }) {
                   Próximo
                 </button>
 
+                {/* Input para saltar página */}
                 <form onSubmit={handlePageInputSubmit} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
                   <span style={{ fontSize: '14px', color: 'var(--muted)' }}>Ir para</span>
                   <input
@@ -875,10 +1011,16 @@ export default function AdminProducts({ embedded = false }) {
         )}
       </div>
 
+      {/* ================================================================ */}
+      {/* MODAIS */}
+      {/* ================================================================ */}
+
+      {/* Modal para ampliar imagem */}
       {modalImage && (
         <ImageModal src={modalImage} alt="Produto" onClose={() => setModalImage(null)} />
       )}
 
+      {/* Modal de confirmação de edição */}
       {showConfirmModal && (
         <div
           style={{
@@ -921,6 +1063,7 @@ export default function AdminProducts({ embedded = false }) {
         </div>
       )}
 
+      {/* Modal de confirmação de eliminação */}
       {showDeleteModal && (
         <div
           style={{
@@ -963,6 +1106,7 @@ export default function AdminProducts({ embedded = false }) {
         </div>
       )}
 
+      {/* Modal de erro de eliminação (produto com encomendas) */}
       {showDeleteErrorModal && (
         <div
           style={{
@@ -1016,6 +1160,7 @@ export default function AdminProducts({ embedded = false }) {
         </div>
       )}
 
+      {/* Modal de sucesso */}
       {showSuccessModal && (
         <div
           style={{

@@ -1,60 +1,70 @@
-// emailservice.js
-// Serviço de envio de emails para a StreetMarket
-// Utiliza Nodemailer com Gmail
+// ================================================================
+// EMAILSERVICE.JS – Serviço de envio de emails
+// ================================================================
+// Este ficheiro contém todas as funções para enviar emails
+// utilizando Nodemailer com Gmail.
+// Tipos de emails suportados:
+// - Confirmação de encomenda (com imagem do produto e convite para review)
+// - Pedido de review (follow-up após receção do produto)
+// - Verificação de email (código de 6 dígitos)
+// - Redefinição de password (link com token)
+// ================================================================
 
-const nodemailer = require('nodemailer');
-const path = require('path');
-const fs = require('fs');
+// Importação dos módulos necessários
+const nodemailer = require('nodemailer');    // Biblioteca para envio de emails
+const path = require('path');                // Manipulação de caminhos de ficheiros
+const fs = require('fs');                    // Manipulação do sistema de ficheiros
 
-// Configuração do transportador de email (Gmail)
+// ================================================================
+// CONFIGURAÇÃO DO TRANSPORTADOR (Gmail)
+// ================================================================
+
+// Cria o transportador com as credenciais do .env
+// EMAIL_USER = endereço de email (ex: streetmarketptt@gmail.com)
+// EMAIL_PASS = senha de aplicação do Gmail (não é a senha normal)
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: 'gmail',                       // Serviço de email (Gmail)
     auth: {
-        user: process.env.EMAIL_USER,   // Utiliza variáveis de ambiente
-        pass: process.env.EMAIL_PASS
+        user: process.env.EMAIL_USER,       // Email que envia as mensagens
+        pass: process.env.EMAIL_PASS        // Senha de aplicação
     }
 });
 
-// ============================================================
-// Envia o email de confirmação de encomenda, com opção de incluir um convite para review.
-// Parâmetros:
-//   to - Email do destinatário
-//   nomeCliente - Nome do cliente
-//   logoUrl - (não usado, mantido para compatibilidade)
-//   corPrimaria - Cor principal da marca (ex: '#e60000') – padrão '#007bff'
-//   orderNumber - Número da encomenda
-//   orderDate - Data da encomenda (ex: '17 de junho de 2026')
-//   items - Lista de itens com { nome, preco, quantidade? }
-//   total - Total da encomenda
-//   produtoImagem - Caminho ou URL da imagem do produto (opcional)
-//   marca - Nome da marca (padrão: 'StreetMarket')
-//   reviewProductId - ID do produto para a review (opcional)
-//   reviewProductName - Nome do produto para a review (opcional)
-// Lança erro se faltarem dados essenciais
-// ============================================================
+// ================================================================
+// FUNÇÃO: Enviar email de confirmação de encomenda
+// ================================================================
+
+// sendOrderEmail – Envia um email com os detalhes da encomenda
+// Inclui:
+// - Logo da marca (inline)
+// - Imagem do produto (inline, se disponível)
+// - Número da encomenda e data
+// - Tabela com os itens comprados
+// - Total da encomenda
+// - Bloco de review (opcional, se reviewProductId for fornecido)
 async function sendOrderEmail({
-    to,
-    nomeCliente,
-    logoUrl,                     // Não utilizado, mas mantido por compatibilidade
-    corPrimaria = '#007bff',     // Cor padrão agora azul (antes era #e60000)
-    orderNumber,
-    orderDate,
-    items,
-    total,
-    produtoImagem = null,
-    marca = "StreetMarket",
-    reviewProductId = null,      // NOVO: ID do produto para o link de review
-    reviewProductName = null     // NOVO: Nome do produto para a mensagem
+    to,                             // Email do destinatário
+    nomeCliente,                    // Nome do cliente
+    logoUrl,                        // (não utilizado, mantido para compatibilidade)
+    corPrimaria = '#007bff',        // Cor principal da marca (azul por padrão)
+    orderNumber,                    // Número da encomenda
+    orderDate,                      // Data da encomenda (formatada)
+    items,                          // Lista de itens { nome, preco, quantidade? }
+    total,                          // Total da encomenda
+    produtoImagem = null,           // Caminho da imagem do produto (opcional)
+    marca = "StreetMarket",          // Nome da marca
+    reviewProductId = null,         // ID do produto para o link de review (opcional)
+    reviewProductName = null        // Nome do produto para a review (opcional)
 }) {
-    // Validação dos dados obrigatórios
+    // ----- 1. VALIDAÇÃO DOS DADOS OBRIGATÓRIOS -----
     if (!to || !nomeCliente || !orderNumber || !items || !total) {
         throw new Error('Faltam dados essenciais para enviar o email de confirmação');
     }
 
-    // Função auxiliar para formatar preços em euros
+    // Função auxiliar para formatar preços em euros (ex: 10.50 -> €10.50)
     const formatPrice = (price) => `€${parseFloat(price).toFixed(2)}`;
 
-    // Construção da tabela de itens (HTML)
+    // ----- 2. CONSTRUÇÃO DA TABELA DE ITENS (HTML) -----
     let itemsHtml = '';
     items.forEach(item => {
         const nome = item.nome;
@@ -68,40 +78,37 @@ async function sendOrderEmail({
         `;
     });
 
-    // Array para anexos (imagens inline)
-    let attachments = [];
-    let logoHtml = '';
+    // ----- 3. CONFIGURAÇÃO DAS IMAGENS INLINE -----
+    let attachments = [];               // Array para anexos (logo + imagem do produto)
+    let logoHtml = '';                 // HTML para a logo
+    let productImageHtml = '';         // HTML para a imagem do produto (secção principal)
+    let reviewImageHtml = '';          // HTML para a imagem do produto (secção de review)
 
-    // ----- LOGO (inline) -----
+    // ----- 3a. LOGO DA MARCA (inline) -----
     const logoPath = path.join(__dirname, '../../frontend/public/LogoStreetmarket.png');
     if (fs.existsSync(logoPath)) {
         attachments.push({
             filename: 'logo.png',
             path: logoPath,
-            cid: 'logo-cid'      // Referência no HTML: src="cid:logo-cid"
+            cid: 'logo-cid'              // Referência no HTML: src="cid:logo-cid"
         });
         logoHtml = `<img src="cid:logo-cid" alt="${marca}" style="max-width: 180px; height: auto; display: block;">`;
     } else {
         console.warn('⚠️ Logo não encontrada em:', logoPath);
-        // Fallback para URL externa (se definida)
+        // Fallback: URL externa (se definida no .env)
         logoHtml = `<img src="${process.env.LOGO_URL || 'http://localhost:5173/LogoStreetmarket.png'}" alt="${marca}" style="max-width: 180px; height: auto; display: block;">`;
     }
 
-    // ----- IMAGEM DO PRODUTO (inline) -----
-    // Esta imagem será usada em dois locais:
-    // 1. Agora em cima do número da encomenda (posição alterada)
-    // 2. No bloco de review (nova funcionalidade)
-    let productImageHtml = '';    // Para a secção de itens (agora antes do número)
-    let reviewImageHtml = '';     // Para o bloco de review (tamanho menor)
+    // ----- 3b. IMAGEM DO PRODUTO (inline) -----
     if (produtoImagem) {
-        // Tenta resolver o caminho absoluto a partir do caminho relativo
+        // Converte o caminho relativo (ex: /uploads/prod-123.jpg) para absoluto
         let relativePath = produtoImagem.replace(/^https?:\/\/localhost:3000/, '');
         const absolutePath = path.join(__dirname, '..', relativePath);
         if (fs.existsSync(absolutePath)) {
             attachments.push({
                 filename: 'produto.jpg',
                 path: absolutePath,
-                cid: 'produto-img'    // Referência: src="cid:produto-img"
+                cid: 'produto-img'           // Referência: src="cid:produto-img"
             });
             // Imagem para a secção principal (maior)
             const imgTag = `<img src="cid:produto-img" alt="Produto" style="max-width: 280px; width: 100%; border-radius: 12px; border: 1px solid #eee;">`;
@@ -121,12 +128,11 @@ async function sendOrderEmail({
         }
     }
 
-    // ----- BLOCO DE REVIEW (NOVO) -----
+    // ----- 4. BLOCO DE REVIEW (opcional) -----
     // Só é gerado se forem fornecidos o ID e o nome do produto
     let reviewBlockHtml = '';
     if (reviewProductId && reviewProductName) {
-        // A URL base deve ser ajustada conforme o ambiente (produção vs desenvolvimento)
-        const reviewLink = `http://localhost:5173/products/${reviewProductId}`; // ALTERAR PARA DOMÍNIO REAL
+        const reviewLink = `http://localhost:5173/products/${reviewProductId}`; // URL para a página do produto
         reviewBlockHtml = `
             <tr>
                 <td align="center" style="padding: 20px 40px 10px 40px; border-top: 1px solid #eee;">
@@ -148,9 +154,7 @@ async function sendOrderEmail({
         `;
     }
 
-    // ----- CONSTRUÇÃO DO HTML DO EMAIL -----
-    // A imagem do produto foi movida para imediatamente após a mensagem pessoal,
-    // antes do bloco "NÚMERO DA ENCOMENDA".
+    // ----- 5. CONSTRUÇÃO DO HTML COMPLETO -----
     const html = `
         <!DOCTYPE html>
         <html>
@@ -184,7 +188,7 @@ async function sendOrderEmail({
                                     <p style="font-size: 16px; color: #666;">A sua encomenda foi recebida com sucesso.</p>
                                 </td>
                             </tr>
-                            <!-- IMAGEM DO PRODUTO (movida para ANTES do número da encomenda) -->
+                            <!-- IMAGEM DO PRODUTO -->
                             ${productImageHtml}
                             <!-- NÚMERO DA ENCOMENDA E DATA -->
                             <tr>
@@ -213,7 +217,7 @@ async function sendOrderEmail({
                                     </table>
                                 </td>
                             </tr>
-                            <!-- BLOCO DE REVIEW (NOVO) - apenas se reviewProductId e reviewProductName forem fornecidos -->
+                            <!-- BLOCO DE REVIEW -->
                             ${reviewBlockHtml}
                             <!-- RODAPÉ -->
                             <tr>
@@ -230,28 +234,24 @@ async function sendOrderEmail({
         </html>
     `;
 
-    // Envio do email
+    // ----- 6. ENVIO DO EMAIL -----
     await transporter.sendMail({
-        from: `"${marca}" <${process.env.EMAIL_USER}>`,
-        to,
-        subject: `Confirmação de Encomenda #${orderNumber}`,
-        html,
-        attachments     // Inclui logo e imagem do produto (se existirem)
+        from: `"${marca}" <${process.env.EMAIL_USER}>`,    // Remetente
+        to,                                               // Destinatário
+        subject: `Confirmação de Encomenda #${orderNumber}`, // Assunto
+        html,                                             // Corpo do email (HTML)
+        attachments                                       // Anexos (logo + imagem do produto)
     });
 }
 
-// ============================================================
-// Envia um email separado para solicitar uma review (caso se queira enviar depois).
-// Esta função é independente e pode ser usada para follow-up.
-// Parâmetros:
-//   to - Email do destinatário
-//   nomeUser - Nome do utilizador
-//   nomeProduto - Nome do produto a avaliar
-//   product_id - ID do produto
-//   imagem - Caminho ou URL da imagem do produto (opcional) - NÃO USADO
-// ============================================================
+// ================================================================
+// FUNÇÃO: Enviar email de pedido de review (follow-up)
+// ================================================================
+
+// sendReviewRequestEmail – Envia um email a pedir uma review
+// Esta função é chamada quando uma encomenda muda para estado "Recebido".
 async function sendReviewRequestEmail(to, nomeUser, nomeProduto, product_id, imagem) {
-    // Array para anexos (imagens inline)
+    // Array para anexos (apenas a logo)
     const attachments = [];
 
     // ----- LOGO (inline) -----
@@ -261,16 +261,15 @@ async function sendReviewRequestEmail(to, nomeUser, nomeProduto, product_id, ima
         attachments.push({
             filename: 'logo.png',
             path: logoPath,
-            cid: 'logo-cid'      // Referência no HTML: src="cid:logo-cid"
+            cid: 'logo-cid'
         });
         logoHtml = `<img src="cid:logo-cid" alt="StreetMarket" style="max-width: 180px; height: auto; display: block;">`;
     } else {
         console.warn('⚠️ Logo não encontrada em:', logoPath);
-        // Fallback para URL externa (se definida)
         logoHtml = `<img src="${process.env.LOGO_URL || 'http://localhost:5173/LogoStreetmarket.png'}" alt="StreetMarket" style="max-width: 180px; height: auto; display: block;">`;
     }
 
-    // ----- HTML DO EMAIL (mesmo estilo dos outros emails, SEM IMAGEM) -----
+    // ----- CONSTRUÇÃO DO HTML -----
     const html = `
         <!DOCTYPE html>
         <html>
@@ -304,7 +303,7 @@ async function sendReviewRequestEmail(to, nomeUser, nomeProduto, product_id, ima
                                     <p style="font-size: 16px; color: #666; margin: 10px 0 0;">A tua opinião é muito importante para nós!</p>
                                 </td>
                             </tr>
-                            <!-- BOTÃO DE REVIEW (sem imagem) -->
+                            <!-- BOTÃO DE REVIEW -->
                             <tr>
                                 <td align="center" style="padding: 10px 40px 30px;">
                                     <a href="http://localhost:5173/products/${product_id}" 
@@ -336,26 +335,25 @@ async function sendReviewRequestEmail(to, nomeUser, nomeProduto, product_id, ima
         </html>
     `;
 
-    // Envio do email
+    // ----- ENVIO DO EMAIL -----
     await transporter.sendMail({
         from: `"StreetMarket" <${process.env.EMAIL_USER}>`,
         to,
         subject: `Avalia o produto "${nomeProduto}"!`,
         html,
-        attachments     // Inclui apenas a logo
+        attachments
     });
 }
 
-// ============================================================
-// Envia email de verificação de registo (código de confirmação).
-// Segue o mesmo layout visual dos emails de confirmação de compra e review.
-// Parâmetros:
-//   to - Email do destinatário
-//   nome - Nome do utilizador
-//   codigo - Código de verificação (6 dígitos, por exemplo)
-// ============================================================
+// ================================================================
+// FUNÇÃO: Enviar email de verificação de registo (código de 6 dígitos)
+// ================================================================
+
+// sendVerificationEmail – Envia um email com o código de verificação
+// O código é usado para confirmar a conta do utilizador.
+// Expira em 15 minutos.
 async function sendVerificationEmail(to, nome, codigo) {
-    // Array para anexos (imagens inline)
+    // Array para anexos (apenas a logo)
     const attachments = [];
 
     // ----- LOGO (inline) -----
@@ -365,16 +363,15 @@ async function sendVerificationEmail(to, nome, codigo) {
         attachments.push({
             filename: 'logo.png',
             path: logoPath,
-            cid: 'logo-cid'      // Referência no HTML: src="cid:logo-cid"
+            cid: 'logo-cid'
         });
         logoHtml = `<img src="cid:logo-cid" alt="StreetMarket" style="max-width: 180px; height: auto; display: block;">`;
     } else {
         console.warn('⚠️ Logo não encontrada em:', logoPath);
-        // Fallback para URL externa (se definida)
         logoHtml = `<img src="${process.env.LOGO_URL || 'http://localhost:5173/LogoStreetmarket.png'}" alt="StreetMarket" style="max-width: 180px; height: auto; display: block;">`;
     }
 
-    // ----- HTML DO EMAIL (mesmo estilo dos outros emails) -----
+    // ----- CONSTRUÇÃO DO HTML -----
     const html = `
         <!DOCTYPE html>
         <html>
@@ -408,7 +405,7 @@ async function sendVerificationEmail(to, nome, codigo) {
                                     <p style="font-size: 16px; color: #666; margin: 10px 0 20px;">Para ativares a tua conta, utiliza o seguinte código de verificação:</p>
                                 </td>
                             </tr>
-                            <!-- CÓDIGO DE VERIFICAÇÃO (destacado) -->
+                            <!-- CÓDIGO DE VERIFICAÇÃO -->
                             <tr>
                                 <td align="center" style="padding: 0 40px 20px;">
                                     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8f9fa; border-radius: 8px; border: 1px solid #eaeaea;">
@@ -441,26 +438,24 @@ async function sendVerificationEmail(to, nome, codigo) {
         </html>
     `;
 
-    // Envio do email
+    // ----- ENVIO DO EMAIL -----
     await transporter.sendMail({
         from: `"StreetMarket" <${process.env.EMAIL_USER}>`,
         to,
         subject: 'Verifica o teu email - StreetMarket',
         html,
-        attachments     // Inclui a logo (se existir)
+        attachments
     });
 }
 
-// ============================================================
-// Envia email para redefinição de password.
-// Segue o mesmo layout visual dos outros emails.
-// Parâmetros:
-//   to - Email do destinatário
-//   nome - Nome do utilizador
-//   resetLink - Link completo para redefinir a password (ex: http://localhost:5173/reset-password/{token})
-// ============================================================
+// ================================================================
+// FUNÇÃO: Enviar email para redefinição de password
+// ================================================================
+
+// sendResetPasswordEmail – Envia um email com link para redefinir a password
+// O link contém um token que expira em 15 minutos.
 async function sendResetPasswordEmail(to, nome, resetLink) {
-    // Array para anexos (imagens inline)
+    // Array para anexos (apenas a logo)
     const attachments = [];
 
     // ----- LOGO (inline) -----
@@ -470,16 +465,15 @@ async function sendResetPasswordEmail(to, nome, resetLink) {
         attachments.push({
             filename: 'logo.png',
             path: logoPath,
-            cid: 'logo-cid'      // Referência no HTML: src="cid:logo-cid"
+            cid: 'logo-cid'
         });
         logoHtml = `<img src="cid:logo-cid" alt="StreetMarket" style="max-width: 180px; height: auto; display: block;">`;
     } else {
         console.warn('⚠️ Logo não encontrada em:', logoPath);
-        // Fallback para URL externa (se definida)
         logoHtml = `<img src="${process.env.LOGO_URL || 'http://localhost:5173/LogoStreetmarket.png'}" alt="StreetMarket" style="max-width: 180px; height: auto; display: block;">`;
     }
 
-    // ----- HTML DO EMAIL (mesmo estilo dos outros) -----
+    // ----- CONSTRUÇÃO DO HTML -----
     const html = `
         <!DOCTYPE html>
         <html>
@@ -546,20 +540,22 @@ async function sendResetPasswordEmail(to, nome, resetLink) {
         </html>
     `;
 
-    // Envio do email
+    // ----- ENVIO DO EMAIL -----
     await transporter.sendMail({
         from: `"StreetMarket" <${process.env.EMAIL_USER}>`,
         to,
         subject: 'Redefinir password - StreetMarket',
         html,
-        attachments     // Inclui a logo
+        attachments
     });
 }
 
-// Exporta as funções para serem usadas noutros módulos
+// ================================================================
+// EXPORTAÇÃO DAS FUNÇÕES
+// ================================================================
 module.exports = {
-    sendOrderEmail,
-    sendReviewRequestEmail,
-    sendVerificationEmail,
-    sendResetPasswordEmail   // <-- NOVA
+    sendOrderEmail,              // Confirmação de encomenda
+    sendReviewRequestEmail,      // Pedido de review (follow-up)
+    sendVerificationEmail,       // Verificação de email (código)
+    sendResetPasswordEmail       // Redefinição de password
 };

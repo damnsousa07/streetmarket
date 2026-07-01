@@ -1,3 +1,16 @@
+// ================================================================
+// PRODUCTDETAILS.JSX – Página de detalhe do produto
+// ================================================================
+// Este componente exibe os detalhes de um produto específico:
+// - Imagens (principal e miniaturas)
+// - Nome, marca, preço, stock
+// - Descrição e tamanhos disponíveis
+// - Média de reviews e lista de reviews
+// - Formulário para escrever review (apenas para utilizadores que receberam o produto)
+// - Botão de compra (desativado se stock <= 0)
+// ================================================================
+
+// Importação dos módulos necessários
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProductById } from '../api/products';
@@ -5,11 +18,19 @@ import { createOrder } from '../api/orders';
 import { createReview, getReviewsByProduct } from '../api/reviews';
 import ImageModal from '../components/ImageModal';
 
+// ================================================================
+// FUNÇÃO AUXILIAR: Verificar se a sessão é válida
+// ================================================================
+
 function isSessionValid() {
     const userId = localStorage.getItem('user_id');
     const expiresAt = Number(localStorage.getItem('auth_expires_at') || 0);
     return !!userId && Date.now() < expiresAt;
 }
+
+// ================================================================
+// COMPONENTE: Stars (componente de estrelas para rating)
+// ================================================================
 
 function Stars({ value = 0, onChange, size = 22, readOnly = false }) {
     const v = Number(value) || 0;
@@ -47,6 +68,10 @@ function Stars({ value = 0, onChange, size = 22, readOnly = false }) {
     );
 }
 
+// ================================================================
+// FUNÇÃO AUXILIAR: Obter URL completa da imagem
+// ================================================================
+
 function getFullImageUrl(imagePath) {
     if (!imagePath) return '';
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
@@ -55,10 +80,15 @@ function getFullImageUrl(imagePath) {
     return `${import.meta.env.VITE_API_URL}${imagePath}`;
 }
 
-export default function ProductDetails() {
-    const { id } = useParams();
-    const navigate = useNavigate();
+// ================================================================
+// COMPONENTE PRINCIPAL: ProductDetails
+// ================================================================
 
+export default function ProductDetails() {
+    const { id } = useParams();          // ID do produto (da URL)
+    const navigate = useNavigate();      // Hook para navegação programática
+
+    // ----- ESTADOS DO PRODUTO -----
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -66,18 +96,22 @@ export default function ProductDetails() {
     const [modalImage, setModalImage] = useState(null);
     const [selectedSize, setSelectedSize] = useState(null);
 
+    // ----- ESTADOS DE COMPRA -----
     const [buying, setBuying] = useState(false);
     const [buyError, setBuyError] = useState('');
 
+    // ----- ESTADOS DE REVIEWS -----
     const [reviews, setReviews] = useState([]);
     const [loadingReviews, setLoadingReviews] = useState(true);
     const [reviewError, setReviewError] = useState('');
 
+    // ----- ESTADOS DE ESCRITA DE REVIEW -----
     const [rating, setRating] = useState(5);
     const [comentario, setComentario] = useState('');
     const [sendingReview, setSendingReview] = useState(false);
     const [sendingReviewError, setSendingReviewError] = useState('');
 
+    // ----- ESTADOS DE PERMISSÃO DE REVIEW -----
     const [canReview, setCanReview] = useState(false);
     const [userReview, setUserReview] = useState(null);
 
@@ -87,6 +121,7 @@ export default function ProductDetails() {
     const hasReviewed = userReview !== null;
     const showReviewForm = canReview && !hasReviewed;
 
+    // ----- CÁLCULO: Média de avaliações -----
     const avgRating = useMemo(() => {
         if (!reviews?.length) return 0;
         const sum = reviews.reduce(
@@ -96,7 +131,12 @@ export default function ProductDetails() {
         return Math.round((sum / reviews.length) * 10) / 10;
     }, [reviews]);
 
+    // ----- FORÇA RECARREGAMENTO -----
     const [refreshKey, setRefreshKey] = useState(0);
+
+    // ================================================================
+    // FUNÇÃO: Carregar produto
+    // ================================================================
 
     async function loadProduct() {
         try {
@@ -125,6 +165,10 @@ export default function ProductDetails() {
         }
     }
 
+    // ================================================================
+    // FUNÇÃO: Carregar reviews
+    // ================================================================
+
     async function loadReviews() {
         try {
             setLoadingReviews(true);
@@ -144,6 +188,10 @@ export default function ProductDetails() {
         }
     }
 
+    // ================================================================
+    // EFFECTS: Carregar dados ao montar ou quando o ID mudar
+    // ================================================================
+
     useEffect(() => {
         let alive = true;
         (async () => {
@@ -153,36 +201,45 @@ export default function ProductDetails() {
         return () => { alive = false; };
     }, [id, refreshKey]);
 
-    useEffect(() => {
-        setRefreshKey(prev => prev + 1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // ================================================================
+    // FUNÇÃO: Comprar produto
+    // ================================================================
 
     async function handleBuy() {
+        // Verifica se a sessão é válida
         if (!isSessionValid()) {
             setBuyError('Tens de iniciar sessão para comprar. (Sessão expirada ou não iniciada)');
             navigate('/login');
             return;
         }
+
+        // Verifica se o utilizador selecionou um tamanho
         if (!selectedSize) {
             setBuyError('Por favor, seleciona um tamanho antes de comprar.');
             return;
         }
+
+        // Verifica se há stock disponível
         if ((product.stock ?? 0) <= 0) {
             setBuyError('Produto sem stock disponível.');
             return;
         }
+
+        // Obtém o ID do utilizador
         const uid = localStorage.getItem('user_id');
         if (!uid) {
             setBuyError('Tens de iniciar sessão para comprar.');
             navigate('/login');
             return;
         }
+
         try {
             setBuying(true);
             setBuyError('');
             console.log('🛒 A comprar:', { uid: Number(uid), productId: Number(product.product_id), selectedSize });
+            // Cria a encomenda no backend
             const response = await createOrder(Number(uid), Number(product.product_id), selectedSize);
+            // Redireciona para o checkout
             navigate(`/checkout/${response.order_id}`, {
                 state: {
                     amount: product.preco,
@@ -197,16 +254,26 @@ export default function ProductDetails() {
         }
     }
 
+    // ================================================================
+    // FUNÇÃO: Submeter review
+    // ================================================================
+
     async function handleSubmitReview(e) {
         e.preventDefault();
+
+        // Verifica se o utilizador está logado
         if (!user_id) {
             alert('Tens de fazer login para escrever uma review.');
             return;
         }
+
+        // Verifica se já escreveu review
         if (hasReviewed) {
             setSendingReviewError('Já escreveste uma review para este produto.');
             return;
         }
+
+        // Validações do formulário
         if (!product?.product_id) return;
         if (!rating || Number(rating) < 1 || Number(rating) > 5) {
             setSendingReviewError('Escolhe uma pontuação entre 1 e 5.');
@@ -216,9 +283,11 @@ export default function ProductDetails() {
             setSendingReviewError('Escreve um comentário.');
             return;
         }
+
         try {
             setSendingReview(true);
             setSendingReviewError('');
+            // Envia a review para o backend
             await createReview({
                 user_id: Number(user_id),
                 product_id: Number(product.product_id),
@@ -227,6 +296,7 @@ export default function ProductDetails() {
             });
             setComentario('');
             setRating(5);
+            // Recarrega os dados
             await loadProduct();
             await loadReviews();
             alert(`🎉 A sua review para "${product.nome}" foi enviada com sucesso!\nObrigado pela sua opinião.`);
@@ -240,6 +310,10 @@ export default function ProductDetails() {
             setSendingReview(false);
         }
     }
+
+    // ================================================================
+    // RENDERIZAÇÃO CONDICIONAL
+    // ================================================================
 
     if (loading) {
         return (
@@ -267,8 +341,13 @@ export default function ProductDetails() {
         ? product.images 
         : (product.imagem ? [{ image_url: product.imagem, is_primary: true }] : []);
 
+    // ================================================================
+    // RENDERIZAÇÃO PRINCIPAL
+    // ================================================================
+
     return (
         <div className="container" style={{ padding: '32px 0' }}>
+            {/* ----- LAYOUT: Imagem (esquerda) + Detalhes (direita) ----- */}
             <div
                 style={{
                     display: 'grid',
@@ -277,7 +356,9 @@ export default function ProductDetails() {
                     alignItems: 'start',
                 }}
             >
+                {/* ----- COLUNA DA ESQUERDA: Imagens ----- */}
                 <div className="card" style={{ padding: 12 }}>
+                    {/* Imagem principal (clicável para ampliar) */}
                     <div
                         style={{
                             aspectRatio: '1 / 1',
@@ -300,6 +381,7 @@ export default function ProductDetails() {
                         )}
                     </div>
 
+                    {/* Miniaturas (apenas se houver mais de 1 imagem) */}
                     {imagesArray.length > 1 && (
                         <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
                             {imagesArray.map((img) => (
@@ -323,10 +405,13 @@ export default function ProductDetails() {
                     )}
                 </div>
 
+                {/* ----- COLUNA DA DIREITA: Detalhes do produto ----- */}
                 <div>
+                    {/* Nome e marca */}
                     <h1 style={{ marginTop: 0 }}>{product.nome}</h1>
                     <div style={{ color: 'var(--muted)', marginTop: 6 }}>{product.marca}</div>
 
+                    {/* Média de avaliações */}
                     <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Stars value={Math.round(avgRating)} readOnly />
                         <div style={{ color: 'var(--muted)' }}>
@@ -340,14 +425,17 @@ export default function ProductDetails() {
                         </div>
                     </div>
 
+                    {/* Preço */}
                     <div style={{ marginTop: 16, fontSize: 22, fontWeight: 900 }}>
                         €{product.preco}
                     </div>
 
+                    {/* Stock */}
                     <div style={{ marginTop: 8, color: 'var(--muted)' }}>
                         Stock: <strong>{product.stock ?? 0}</strong> unidades
                     </div>
 
+                    {/* Descrição */}
                     {product.descricao ? (
                         <p style={{ color: 'var(--muted)', marginTop: 16, lineHeight: 1.6 }}>
                             {product.descricao}
@@ -358,6 +446,7 @@ export default function ProductDetails() {
                         </p>
                     )}
 
+                    {/* Tamanhos disponíveis */}
                     {product.tamanhos && (
                         <div style={{ marginTop: 16 }}>
                             <div style={{ fontWeight: 700, marginBottom: 8 }}>Tamanhos disponíveis:</div>
@@ -386,6 +475,7 @@ export default function ProductDetails() {
                         </div>
                     )}
 
+                    {/* Botão Comprar */}
                     <div style={{ marginTop: 20, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                         <button
                             className="btn btn-primary"
@@ -403,21 +493,29 @@ export default function ProductDetails() {
                         </button>
                     </div>
 
+                    {/* Mensagem de sessão expirada */}
                     {!isSessionValid() && (
                         <p style={{ color: 'salmon', marginTop: 12 }}>
                             Tens de iniciar sessão para comprar. A tua sessão expira em 10 minutos.
                         </p>
                     )}
 
+                    {/* Erro de compra */}
                     {buyError && <p style={{ color: 'salmon', marginTop: 12 }}>{buyError}</p>}
                 </div>
             </div>
 
+            {/* Modal para ampliar imagem */}
             {modalImage && (
                 <ImageModal src={modalImage} alt={product.nome} onClose={() => setModalImage(null)} />
             )}
 
+            {/* ================================================================ */}
+            {/* SECÇÃO DE REVIEWS */}
+            {/* ================================================================ */}
+
             <div style={{ marginTop: 28 }}>
+                {/* Lista de reviews */}
                 <div className="card" style={{ padding: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
                         <div>
@@ -470,15 +568,18 @@ export default function ProductDetails() {
                     )}
                 </div>
 
+                {/* Formulário para escrever review (apenas se o utilizador puder) */}
                 {showReviewForm && (
                     <div className="card" style={{ padding: 14, marginTop: 12 }}>
                         <h3 style={{ marginTop: 0 }}>Escrever uma review</h3>
                         <form onSubmit={handleSubmitReview} style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+                            {/* Avaliação (estrelas) */}
                             <div>
                                 <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Pontuação</div>
                                 <Stars value={rating} onChange={setRating} readOnly={false} />
                             </div>
 
+                            {/* Comentário */}
                             <div>
                                 <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Comentário</div>
                                 <textarea
@@ -490,10 +591,12 @@ export default function ProductDetails() {
                                 />
                             </div>
 
+                            {/* Mensagem de erro do envio */}
                             {sendingReviewError && (
                                 <p style={{ color: 'salmon', margin: 0 }}>{sendingReviewError}</p>
                             )}
 
+                            {/* Botão de envio */}
                             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                 <button
                                     className="btn btn-primary"

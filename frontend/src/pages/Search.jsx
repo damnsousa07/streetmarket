@@ -1,12 +1,27 @@
-// Search.jsx
-// Página de pesquisa e filtragem de produtos com base em parâmetros da URL.
-// Permite filtrar por termo, categoria, marca, género, faixa de preço e ordenação,
-// com paginação.
+// ================================================================
+// SEARCH.JSX – Página de pesquisa e filtragem de produtos
+// ================================================================
+// Este componente permite ao utilizador pesquisar e filtrar produtos
+// utilizando parâmetros da URL (query string).
+// Filtros disponíveis:
+// - Termo de pesquisa (q)
+// - Categoria (category_id)
+// - Marca (brand)
+// - Género (gender)
+// - Faixa de preço (min_price, max_price)
+// - Ordenação (sort)
+// Inclui paginação (12 produtos por página).
+// ================================================================
 
+// Importação dos módulos necessários
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { searchProducts, getBrands } from '../api/products';
 import { getCategories } from '../api/categories';
+
+// ================================================================
+// FUNÇÃO AUXILIAR: Obter URL completa da imagem
+// ================================================================
 
 function getFullImageUrl(imagePath) {
     if (!imagePath) return '';
@@ -16,22 +31,28 @@ function getFullImageUrl(imagePath) {
     return `${import.meta.env.VITE_API_URL}${imagePath}`;
 }
 
+// ================================================================
+// COMPONENTE: Search
+// ================================================================
+
 export default function Search() {
+    // ----- OBTÉM PARÂMETROS DA URL -----
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const [products, setProducts] = useState([]);
-    const [categories, setCategories] = useState([]);
-    const [brands, setBrands] = useState([]);
+    // ----- ESTADOS -----
+    const [products, setProducts] = useState([]);      // Produtos encontrados
+    const [categories, setCategories] = useState([]);  // Lista de categorias (para o dropdown)
+    const [brands, setBrands] = useState([]);          // Lista de marcas (para o dropdown)
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // Paginação
+    // ----- ESTADOS DE PAGINAÇÃO -----
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [pageInput, setPageInput] = useState('');
-    const limit = 12;
+    const limit = 12; // Produtos por página
 
-    // Lê os parâmetros da URL
+    // ----- LÊ OS PARÂMETROS DA URL (com valores padrão) -----
     const q = searchParams.get('q') || '';
     const category_id = searchParams.get('category_id') || '';
     const brand = searchParams.get('brand') || '';
@@ -40,15 +61,20 @@ export default function Search() {
     const max_price = searchParams.get('max_price') || '';
     const sort = searchParams.get('sort') || 'price_asc';
 
-    // Buscar produtos com paginação
+    // ================================================================
+    // FUNÇÃO: Buscar produtos com paginação e filtros
+    // ================================================================
+
     const fetchProducts = async (page = 1) => {
         setLoading(true);
         setError('');
 
         try {
+            // Constrói os filtros com os parâmetros da URL
             const filters = { q, category_id, brand, gender, min_price, max_price, sort, page, limit };
             const response = await searchProducts(filters);
             console.log('📦 Resposta do Search:', response);
+            // Atualiza os estados com os dados recebidos
             setProducts(response.data || []);
             setCurrentPage(response.meta?.currentPage || 1);
             setTotalPages(response.meta?.totalPages || 1);
@@ -61,14 +87,21 @@ export default function Search() {
         }
     };
 
-    // Quando os filtros mudarem, reset para página 1
+    // ================================================================
+    // EFFECT: Carregar produtos quando os filtros mudarem
+    // ================================================================
+
+    // Quando os filtros mudarem, reset para a página 1
     useEffect(() => {
         setCurrentPage(1);
         fetchProducts(1);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q, category_id, brand, gender, min_price, max_price, sort]);
 
-    // Carregar categorias e marcas
+    // ================================================================
+    // EFFECT: Carregar categorias e marcas (dropdowns)
+    // ================================================================
+
     useEffect(() => {
         const loadCategories = async () => {
             try {
@@ -90,7 +123,11 @@ export default function Search() {
         loadBrands();
     }, []);
 
-    // Handlers de filtro
+    // ================================================================
+    // HANDLERS: Filtros e navegação
+    // ================================================================
+
+    // Handler para mudanças nos filtros (atualiza a URL)
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         const newParams = new URLSearchParams(searchParams);
@@ -102,11 +139,12 @@ export default function Search() {
         setSearchParams(newParams);
     };
 
+    // Limpa todos os filtros (volta ao estado inicial)
     const clearFilters = () => {
         setSearchParams({ q: '', category_id: '', brand: '', gender: '', min_price: '', max_price: '', sort: 'price_asc' });
     };
 
-    // Navegação de páginas
+    // Muda para a página especificada (se válida)
     const handlePageChange = (newPage) => {
         if (newPage >= 1 && newPage <= totalPages) {
             setCurrentPage(newPage);
@@ -114,6 +152,7 @@ export default function Search() {
         }
     };
 
+    // Submissão do input de salto de página
     const handlePageInputSubmit = (e) => {
         e.preventDefault();
         const page = Number(pageInput);
@@ -121,10 +160,11 @@ export default function Search() {
             setCurrentPage(page);
             fetchProducts(page);
         } else {
-            setPageInput(currentPage.toString());
+            setPageInput(currentPage.toString()); // Reset se inválido
         }
     };
 
+    // Gera um array com os números das páginas
     const getPageNumbers = () => {
         const pages = [];
         for (let i = 1; i <= totalPages; i++) {
@@ -133,12 +173,19 @@ export default function Search() {
         return pages;
     };
 
+    // ================================================================
+    // RENDERIZAÇÃO
+    // ================================================================
+
     return (
         <div className="container" style={{ padding: '32px 0' }}>
+            {/* Layout de duas colunas: filtros à esquerda, resultados à direita */}
             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                {/* ===== PAINEL LATERAL DE FILTROS ===== */}
                 <aside style={{ width: 260, background: 'var(--surface-2)', borderRadius: 12, padding: 16 }}>
                     <h3 style={{ marginTop: 0 }}>Filtros</h3>
 
+                    {/* Campo de pesquisa por termo */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 6 }}>Pesquisar</label>
                         <input
@@ -151,6 +198,7 @@ export default function Search() {
                         />
                     </div>
 
+                    {/* Filtro por categoria */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 6 }}>Categoria</label>
                         <select
@@ -168,6 +216,7 @@ export default function Search() {
                         </select>
                     </div>
 
+                    {/* Filtro por marca */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 6 }}>Marca</label>
                         <select
@@ -183,6 +232,7 @@ export default function Search() {
                         </select>
                     </div>
 
+                    {/* Filtro por género */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 6 }}>Género</label>
                         <select
@@ -198,6 +248,7 @@ export default function Search() {
                         </select>
                     </div>
 
+                    {/* Preço mínimo */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 6 }}>Preço mínimo (€)</label>
                         <input
@@ -210,6 +261,7 @@ export default function Search() {
                         />
                     </div>
 
+                    {/* Preço máximo */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 6 }}>Preço máximo (€)</label>
                         <input
@@ -222,6 +274,7 @@ export default function Search() {
                         />
                     </div>
 
+                    {/* Ordenação */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 6 }}>Ordenar por</label>
                         <select
@@ -237,23 +290,29 @@ export default function Search() {
                         </select>
                     </div>
 
+                    {/* Botão para limpar todos os filtros */}
                     <button className="btn btn-ghost" onClick={clearFilters} style={{ width: '100%' }}>
                         Limpar filtros
                     </button>
                 </aside>
 
+                {/* ===== ÁREA PRINCIPAL (RESULTADOS) ===== */}
                 <main style={{ flex: 1 }}>
+                    {/* Cabeçalho com contagem e indicador de carregamento */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
                         <h2 style={{ margin: 0 }}>Resultados ({products.length})</h2>
                         {loading && <p style={{ margin: 0 }}>A carregar...</p>}
                     </div>
 
+                    {/* Mensagem de erro */}
                     {error && <p style={{ color: 'salmon' }}>{error}</p>}
 
+                    {/* Mensagem quando não há produtos */}
                     {!loading && products.length === 0 && !error && (
                         <p style={{ color: 'var(--muted)' }}>Nenhum produto encontrado.</p>
                     )}
 
+                    {/* Grelha de produtos (cards) */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
                         {products.map(p => (
                             <Link
@@ -262,6 +321,7 @@ export default function Search() {
                                 className="card"
                                 style={{ padding: 14, textDecoration: 'none', color: 'inherit' }}
                             >
+                                {/* Container da imagem (proporção 1:1) */}
                                 <div style={{
                                     aspectRatio: '1/1',
                                     background: 'var(--surface-2)',
@@ -278,7 +338,7 @@ export default function Search() {
                                         <div style={{ width: '100%', height: '100%' }} />
                                     )}
                                 </div>
-
+                                {/* Informações do produto */}
                                 <div style={{ marginTop: 12 }}>
                                     <div style={{ fontWeight: 700 }}>{p.nome}</div>
                                     <div style={{ color: 'var(--muted)', fontSize: 13 }}>{p.marca}</div>
@@ -288,9 +348,10 @@ export default function Search() {
                         ))}
                     </div>
 
-                    {/* Paginação */}
+                    {/* ----- PAGINAÇÃO ----- */}
                     {totalPages > 1 && (
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '32px', flexWrap: 'wrap' }}>
+                            {/* Botão Anterior */}
                             <button
                                 onClick={() => handlePageChange(currentPage - 1)}
                                 disabled={currentPage === 1}
@@ -299,6 +360,8 @@ export default function Search() {
                             >
                                 Anterior
                             </button>
+
+                            {/* Números das páginas */}
                             {getPageNumbers().map(num => (
                                 <button
                                     key={num}
@@ -315,6 +378,8 @@ export default function Search() {
                                     {num}
                                 </button>
                             ))}
+
+                            {/* Botão Próximo */}
                             <button
                                 onClick={() => handlePageChange(currentPage + 1)}
                                 disabled={currentPage === totalPages}
@@ -324,6 +389,7 @@ export default function Search() {
                                 Próximo
                             </button>
 
+                            {/* Input para saltar página */}
                             <form onSubmit={handlePageInputSubmit} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px' }}>
                                 <span style={{ fontSize: '14px', color: 'var(--muted)' }}>Ir para</span>
                                 <input

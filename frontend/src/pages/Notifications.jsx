@@ -1,13 +1,20 @@
-// Notifications.jsx
-// Página que exibe as notificações do utilizador autenticado.
-// As notificações são carregadas da API e exibidas com um badge de tipo (encomenda, review, admin).
+// ================================================================
+// NOTIFICATIONS.JSX – Página de notificações do utilizador
+// ================================================================
+// Este componente exibe as notificações do utilizador autenticado.
+// As notificações são carregadas da API e exibidas com um badge
+// colorido consoante o tipo (Encomenda, Review, Admin).
+// ================================================================
 
+// Importação dos módulos necessários
 import { useEffect, useState } from 'react';
 import { getNotificationsByUser } from '../api/notifications';
 
-// ------------------------------------------------------------
-// Componente interno: exibe um badge (etiqueta) com cor diferente consoante o tipo.
-// Recebe: tipo (string) – ex: 'encomenda', 'review', 'admin'
+// ================================================================
+// COMPONENTE: TypeBadge (badge colorido para o tipo de notificação)
+// ================================================================
+
+// Exibe um badge com cor diferente consoante o tipo de notificação
 function TypeBadge({ tipo }) {
     // Normaliza o tipo para minúsculas (para comparação)
     const t = (tipo || '').toLowerCase();
@@ -28,7 +35,6 @@ function TypeBadge({ tipo }) {
         border = 'rgba(245, 158, 11, 0.35)';
     }
 
-    // Renderiza o badge estilizado
     return (
         <span
             style={{
@@ -47,15 +53,20 @@ function TypeBadge({ tipo }) {
     );
 }
 
-// ------------------------------------------------------------
-// Componente principal: lista de notificações
+// ================================================================
+// COMPONENTE PRINCIPAL: Notifications
+// ================================================================
+
 export default function Notifications() {
-    // Estados para armazenar as notificações, loading e erro
-    const [items, setItems] = useState([]);
+    // ----- ESTADOS -----
+    const [items, setItems] = useState([]);      // Lista de notificações
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    // Função que carrega as notificações da API
+    // ================================================================
+    // FUNÇÃO: Carregar notificações da API
+    // ================================================================
+
     async function load() {
         // Obtém o user_id do localStorage (guardado no login)
         const rawUserId = localStorage.getItem('user_id');
@@ -76,30 +87,27 @@ export default function Notifications() {
         }
 
         try {
-            setLoading(true);   // Ativa o carregamento
-            setError('');       // Limpa erros anteriores
-
+            setLoading(true);
+            setError('');
             // Chama a API para buscar notificações do utilizador
             const data = await getNotificationsByUser(user_id);
-            setItems(Array.isArray(data) ? data : []); // Garante que é um array
+            setItems(Array.isArray(data) ? data : []);
         } catch (e) {
-            // Log detalhado para depuração no console
+            // Log detalhado para depuração
             console.log('NOTIFICATIONS ERROR:', e);
             console.log('STATUS:', e?.response?.status);
             console.log('DATA:', e?.response?.data);
 
-            // Extrai informações do erro para mostrar no UI
+            // Constrói mensagem de erro amigável
             const status = e?.response?.status;
             const message = e?.response?.data?.message;
-
-            // Constrói mensagem de erro amigável
             setError(
                 `Não foi possível carregar as notificações. ` +
                 `${status ? `(HTTP ${status})` : ''} ` +
                 `${message ? `- ${message}` : ''}`
             );
         } finally {
-            setLoading(false); // Desativa o carregamento
+            setLoading(false);
         }
     }
 
@@ -109,8 +117,10 @@ export default function Notifications() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Array vazio = executa apenas uma vez
 
-    // ------------------------------------------------------------
-    // Renderização da página
+    // ================================================================
+    // RENDERIZAÇÃO
+    // ================================================================
+
     return (
         <div className="container" style={{ padding: '32px 0' }}>
             {/* Cabeçalho com título, subtítulo e botão "Atualizar" */}
@@ -121,7 +131,6 @@ export default function Notifications() {
                         Atualizações do sistema para a tua conta.
                     </p>
                 </div>
-
                 <button className="btn btn-ghost" onClick={load} disabled={loading}>
                     Atualizar
                 </button>
@@ -140,7 +149,6 @@ export default function Notifications() {
             {!loading && !error && items.length > 0 && (
                 <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
                     {items.map((n, idx) => (
-                        // Cada notificação é um card com badge e conteúdo
                         <div
                             key={n.notification_id ?? `${n.user_id}-${n.data_envio}-${idx}`}
                             className="card"

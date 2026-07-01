@@ -1,7 +1,12 @@
-// PaymentCheckout.jsx
-// Componente de pagamento que suporta Stripe (cartão) e PayPal.
-// Utiliza o Stripe Elements para capturar dados do cartão de forma segura.
+// ================================================================
+// PAYMENTCHECKOUT.JSX – Componente de pagamento (Stripe e PayPal)
+// ================================================================
+// Este componente permite ao utilizador escolher entre pagamento com
+// cartão de crédito (Stripe) ou PayPal.
+// Utiliza o Stripe Elements para processar o cartão de forma segura.
+// ================================================================
 
+// Importação dos módulos necessários
 import React, { useState } from 'react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import stripePromise from '../utils/stripe';
@@ -11,18 +16,24 @@ import { updatePaymentMethod } from '../api/orders';
 // URL base da API (definida no .env)
 const API_URL = import.meta.env.VITE_API_URL;
 
-// ------------------------------------------------------------
-// Componente interno: formulário de pagamento com Stripe (cartão)
+// ================================================================
+// COMPONENTE INTERNO: StripeForm (pagamento com cartão)
+// ================================================================
+
+// Formulário para pagamento com cartão de crédito
+// Utiliza o Stripe Elements para capturar os dados do cartão
 const StripeForm = ({ amount, orderId, userId, onSuccess }) => {
-    const stripe = useStripe();
-    const elements = useElements();
+    const stripe = useStripe();          // Hook do Stripe para confirmar pagamento
+    const elements = useElements();      // Hook para aceder aos elementos do formulário
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // ----- SUBMISSÃO DO FORMULÁRIO -----
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // Verifica se o Stripe já está carregado
         if (!stripe || !elements) {
             setError('Stripe não está pronto.');
             return;
@@ -32,24 +43,27 @@ const StripeForm = ({ amount, orderId, userId, onSuccess }) => {
         setError('');
 
         try {
+            // 1. Cria o PaymentIntent no backend
             const { data } = await axios.post(`${API_URL}/payments/create-payment-intent`, {
                 amount,
                 orderId,
                 user_id: userId,
             });
 
+            // 2. Confirma o pagamento com o cartão do utilizador
             const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(data.clientSecret, {
                 payment_method: { card: elements.getElement(CardElement) },
             });
 
             if (stripeError) throw new Error(stripeError.message);
 
+            // 3. Se o pagamento for bem-sucedido
             if (paymentIntent.status === 'succeeded') {
-                // Guarda o método de pagamento
+                // Guarda o método de pagamento (Débito)
                 await updatePaymentMethod(orderId, 'Débito');
                 // Envia email de confirmação
                 await axios.post(`${API_URL}/payments/send-order-email`, { orderId, userId });
-                onSuccess();
+                onSuccess();  // Chama o callback de sucesso
             }
         } catch (err) {
             setError(err.message);
@@ -60,6 +74,7 @@ const StripeForm = ({ amount, orderId, userId, onSuccess }) => {
 
     return (
         <form onSubmit={handleSubmit}>
+            {/* Campo do cartão (estilizado) */}
             <div style={{
                 border: '1px solid #ccc',
                 padding: '12px',
@@ -70,6 +85,7 @@ const StripeForm = ({ amount, orderId, userId, onSuccess }) => {
                 <CardElement options={{ hidePostalCode: true }} />
             </div>
 
+            {/* Botão de pagamento */}
             <button
                 type="submit"
                 disabled={!stripe || loading}
@@ -88,20 +104,28 @@ const StripeForm = ({ amount, orderId, userId, onSuccess }) => {
                 {loading ? 'Processando...' : `Pagar €${amount}`}
             </button>
 
+            {/* Mensagem de erro */}
             {error && <div style={{ color: '#ff6b6b', marginTop: '12px', textAlign: 'center' }}>{error}</div>}
         </form>
     );
 };
 
-// ------------------------------------------------------------
-// Componente principal
+// ================================================================
+// COMPONENTE PRINCIPAL: PaymentCheckout
+// ================================================================
+
+// Componente que permite escolher entre cartão e PayPal
 const PaymentCheckout = ({ orderId, amount, userId, onSuccess }) => {
+    // Estado para controlar o método de pagamento selecionado
     const [method, setMethod] = useState('card');
 
+    // Estados para PayPal
     const [paypalLoading, setPaypalLoading] = useState(false);
     const [paypalError, setPaypalError] = useState('');
 
+    // ----- FUNÇÃO: Redirecionar para PayPal -----
     const handlePaypalRedirect = async () => {
+        // Valida o valor do pagamento
         if (!amount || amount <= 0) {
             setPaypalError('Valor inválido para pagamento.');
             return;
@@ -111,6 +135,7 @@ const PaymentCheckout = ({ orderId, amount, userId, onSuccess }) => {
         setPaypalError('');
 
         try {
+            // Cria a ordem PayPal no backend
             const { data } = await axios.post(`${API_URL}/payments/create-paypal-order`, {
                 amount,
                 orderId,
@@ -120,7 +145,10 @@ const PaymentCheckout = ({ orderId, amount, userId, onSuccess }) => {
             // Guarda o método de pagamento antes de redirecionar
             await updatePaymentMethod(orderId, 'PayPal');
 
+            // Guarda o ID da ordem pendente
             localStorage.setItem('pending_order_id', orderId);
+
+            // Redireciona o utilizador para o PayPal
             window.location.href = data.approvalUrl;
         } catch (err) {
             console.error('Erro ao iniciar PayPal:', err);
@@ -129,6 +157,7 @@ const PaymentCheckout = ({ orderId, amount, userId, onSuccess }) => {
         }
     };
 
+    // ----- RENDERIZAÇÃO -----
     return (
         <div style={{
             maxWidth: 500,
@@ -137,6 +166,7 @@ const PaymentCheckout = ({ orderId, amount, userId, onSuccess }) => {
             backgroundColor: 'rgb(11, 18, 32)',
             borderRadius: 16
         }}>
+            {/* Seleção do método de pagamento */}
             <div style={{ display: 'flex', gap: 20, marginBottom: 20, justifyContent: 'center' }}>
                 <label style={{ color: '#fff', cursor: 'pointer' }}>
                     <input
@@ -158,12 +188,14 @@ const PaymentCheckout = ({ orderId, amount, userId, onSuccess }) => {
                 </label>
             </div>
 
+            {/* Renderiza o StripeForm se o método for cartão */}
             {method === 'card' && (
                 <Elements stripe={stripePromise}>
                     <StripeForm amount={amount} orderId={orderId} userId={userId} onSuccess={onSuccess} />
                 </Elements>
             )}
 
+            {/* Renderiza o botão PayPal se o método for PayPal */}
             {method === 'paypal' && (
                 <div>
                     <button

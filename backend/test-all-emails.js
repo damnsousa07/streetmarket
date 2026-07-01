@@ -8,13 +8,13 @@ require('dotenv').config();
 const { sendOrderEmail, sendReviewRequestEmail, sendVerificationEmail } = require('./services/emailservice');
 
 // ============================================================
-// CONFIGURAÇÃO – ALTERA ESTES DADOS PARA O TEU TESTE
+// CONFIGURAÇÃO
 // ============================================================
-const testEmail = 'teu-email@gmail.com';   // Substituir pelo teu email
+const testEmail = 'teu-email@gmail.com';   
 const nomeUser = 'João';
 const nomeProduto = 'Produto Exemplo';
-const productId = 123;                     // ID real de um produto (para o link)
-const imagemCaminho = '/uploads/produto.jpg'; // NÃO USADO (ignorado)
+const productId = 123;                     
+const imagemCaminho = '/uploads/produto.jpg'; 
 
 // ============================================================
 // EXECUÇÃO DOS TESTES
@@ -30,7 +30,7 @@ const imagemCaminho = '/uploads/produto.jpg'; // NÃO USADO (ignorado)
         console.log('✅ Email de verificação enviado');
 
         // ============================================================
-        // 2. EMAIL DE REVIEW (separado) – SEM IMAGEM (a imagem é ignorada)
+        // 2. EMAIL DE REVIEW (separado) 
         // ============================================================
         await sendReviewRequestEmail(testEmail, nomeUser, nomeProduto, productId, null);
         console.log('✅ Email de review (sem imagem) enviado');

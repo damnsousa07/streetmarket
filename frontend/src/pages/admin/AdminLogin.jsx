@@ -1,31 +1,44 @@
-// AdminLogin.jsx
-// Página de autenticação para o painel de administração.
-// Permite definir ou limpar a chave de administrador (admin_key) no localStorage.
+// ================================================================
+// ADMINLOGIN.JSX – Página de autenticação do painel administrativo
+// ================================================================
+// Este componente permite ao administrador definir ou limpar a chave
+// de administrador (admin_key) no localStorage.
+// A chave é utilizada em todas as chamadas à API admin (header x-admin-key).
+// ================================================================
 
+// Importação dos módulos necessários
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// ================================================================
+// COMPONENTE: AdminLogin
+// ================================================================
+
 export default function AdminLogin() {
-    // Estado que guarda a chave de administrador (inicializada com o valor do localStorage, se existir)
+    // Estado que guarda a chave de administrador
+    // Inicializada com o valor do localStorage (se existir)
     const [key, setKey] = useState(localStorage.getItem('admin_key') || '');
     const navigate = useNavigate();
 
-    // Submissão do formulário: guarda a chave no localStorage e redireciona para o dashboard admin
-    function handleSubmit(e) {
+    // ----- FUNÇÃO: Submeter formulário (guardar chave) -----
+    const handleSubmit = (e) => {
         e.preventDefault(); // Previne o recarregamento da página
-        localStorage.setItem('admin_key', key.trim()); // Guarda a chave (sem espaços)
-        navigate('/admin', { replace: true }); // Redireciona para /admin, substituindo a entrada do histórico
-    }
+        localStorage.setItem('admin_key', key.trim()); // Guarda a chave (remove espaços extra)
+        navigate('/admin', { replace: true }); // Redireciona para o dashboard admin
+    };
 
-    // Função que limpa a chave do localStorage e reseta o campo de input
-    function handleClear() {
-        localStorage.removeItem('admin_key'); // Remove a chave do storage
+    // ----- FUNÇÃO: Limpar chave -----
+    const handleClear = () => {
+        localStorage.removeItem('admin_key'); // Remove a chave do localStorage
         setKey(''); // Limpa o campo de texto
-    }
+    };
 
+    // ----- RENDERIZAÇÃO -----
     return (
         <div className="container" style={{ padding: '64px 0' }}>
+            {/* Card centralizado */}
             <div className="card" style={{ padding: 18, maxWidth: 460, margin: '0 auto' }}>
+                {/* Cabeçalho */}
                 <h1 style={{ marginTop: 0 }}>Admin</h1>
                 <p style={{ color: 'var(--muted)', marginTop: 6 }}>
                     Insere a chave de administrador (header <strong>x-admin-key</strong>).
@@ -45,7 +58,7 @@ export default function AdminLogin() {
                         required
                     />
 
-                    {/* Botões para Entrar e Limpar */}
+                    {/* Botões: Entrar e Limpar */}
                     <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
                         <button className="btn btn-primary" type="submit" style={{ flex: 1 }}>
                             Entrar

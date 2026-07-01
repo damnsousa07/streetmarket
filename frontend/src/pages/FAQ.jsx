@@ -1,10 +1,19 @@
-// FAQ.jsx
-// Página de Perguntas Frequentes (FAQ) com accordion expansível.
-// Contacto apenas por email (sem suporte ao cliente).
+// ================================================================
+// FAQ.JSX – Página de Perguntas Frequentes
+// ================================================================
+// Este componente exibe uma lista de perguntas frequentes (FAQ)
+// com um sistema de accordion (expansível/colapsável).
+// Cada pergunta pode ser clicada para revelar a resposta.
+// Inclui também um rodapé com contacto por email.
+// ================================================================
 
+// Importação do React (necessário para hooks)
 import { useState } from 'react';
 
-// Dados das perguntas e respostas (ajustados para a StreetMarket)
+// ================================================================
+// DADOS: Perguntas e respostas (ajustados para a StreetMarket)
+// ================================================================
+
 const faqData = [
   {
     question: 'Como faço uma encomenda?',
@@ -52,23 +61,32 @@ const faqData = [
   },
 ];
 
+// ================================================================
+// COMPONENTE: FAQ
+// ================================================================
+
 export default function FAQ() {
+  // Estado para controlar qual pergunta está aberta (null = nenhuma)
   const [openIndex, setOpenIndex] = useState(null);
 
+  // Alterna a expansão de uma pergunta (fecha se já estiver aberta)
   const toggle = (index) => {
     setOpenIndex(openIndex === index ? null : index);
   };
 
+  // ----- RENDERIZAÇÃO -----
   return (
     <div className="container" style={{ padding: '32px 0', maxWidth: '800px', margin: '0 auto' }}>
+      {/* Cabeçalho */}
       <h1 style={{ textAlign: 'center', marginBottom: '8px' }}>Perguntas Frequentes</h1>
       <p style={{ textAlign: 'center', color: 'var(--muted)', marginBottom: '32px' }}>
         Encontra aqui as respostas às perguntas mais comuns.
       </p>
 
+      {/* Lista de perguntas (accordion) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {faqData.map((item, index) => {
-          const isOpen = openIndex === index;
+          const isOpen = openIndex === index; // Verifica se esta pergunta está aberta
           return (
             <div
               key={index}
@@ -78,8 +96,9 @@ export default function FAQ() {
                 cursor: 'pointer',
                 transition: 'all 0.2s',
               }}
-              onClick={() => toggle(index)}
+              onClick={() => toggle(index)} // Abre/fecha ao clicar
             >
+              {/* Cabeçalho da pergunta */}
               <div
                 style={{
                   display: 'flex',
@@ -90,14 +109,16 @@ export default function FAQ() {
                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
                   {item.question}
                 </h3>
+                {/* Ícone: − quando aberto, + quando fechado */}
                 <span style={{ fontSize: '24px', color: '#007bff' }}>
                   {isOpen ? '−' : '+'}
                 </span>
               </div>
 
+              {/* Resposta (expansível) */}
               <div
                 style={{
-                  maxHeight: isOpen ? '500px' : '0',
+                  maxHeight: isOpen ? '500px' : '0', // Altura máxima quando aberto
                   overflow: 'hidden',
                   transition: 'max-height 0.3s ease, margin-top 0.3s ease',
                   marginTop: isOpen ? '12px' : '0',
