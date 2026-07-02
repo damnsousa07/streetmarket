@@ -1,117 +1,97 @@
 // ================================================================
-// ORDERS.JS – Rotas de encomendas (públicas e internas)
+// ORDERS.JS – Rotas de encomendas (publicas e internas)
 // ================================================================
-// Este ficheiro contém as rotas para gerir encomendas:
-// - Criação de encomenda (com verificação de stock)
-// - Atualização do método de pagamento
-// - Listagem de encomendas do utilizador
-// - Detalhe de uma encomenda específica
+// Contem as rotas para gerir encomendas: criacao, pagamento, listagem e detalhe.
 // ================================================================
 
-// Importação dos módulos necessários
-const express = require('express');        // Framework para construir a API
-const router = express.Router();           // Cria um router para definir as rotas
-const db = require('../db');               // Ligação à base de dados MySQL
+const express = require('express');
+const router = express.Router();
+const db = require('../db');
 
 // ================================================================
-// ROTA: Criar uma nova encomenda (com verificação de stock)
+// ROTA: Criar uma nova encomenda
 // ================================================================
 
 // POST /orders – Cria uma encomenda para um utilizador
-// Esta rota é chamada quando o utilizador clica em "Comprar" no ProductDetails.
-// Utiliza transação para garantir consistência dos dados.
+// Chamada quando o utilizador clica em "Comprar" no ProductDetails.
+// Apenas verifica o stock, nao decrementa (apenas na confirmacao do pagamento).
 router.post('/', async (req, res) => {
-  // Extrai os dados do corpo da requisição
   const { user_id, product_id, tamanho } = req.body;
   
-  // Validação: todos os campos são obrigatórios
+  // Validacao: todos os campos sao obrigatorios
   if (!user_id || !product_id || !tamanho) {
-    return res.status(400).json({ message: 'Faltam dados obrigatórios.' });
+    return res.status(400).json({ message: 'Faltam dados obrigatorios.' });
   }
 
-  // Obtém uma ligação à base de dados para usar transação
   const connection = await db.promise().getConnection();
   try {
-    // Inicia a transação (atomicidade: tudo ou nada)
     await connection.beginTransaction();
 
-    // 1. Verifica o stock do produto (com FOR UPDATE para bloquear a linha)
+    // Verifica o stock do produto com FOR UPDATE para bloquear a linha
+    // Isto evita que dois utilizadores comprem o mesmo produto em simultaneo
     const [products] = await connection.query(
       'SELECT stock FROM Products WHERE product_id = ? FOR UPDATE',
       [product_id]
     );
     
-    // Se o produto não existir, desfaz a transação e retorna erro
     if (products.length === 0) {
       await connection.rollback();
-      return res.status(404).json({ message: 'Produto não encontrado.' });
+      return res.status(404).json({ message: 'Produto nao encontrado.' });
     }
     
-    // Se o stock for insuficiente (<= 0), desfaz a transação e retorna erro
     if (products[0].stock <= 0) {
       await connection.rollback();
-      return res.status(400).json({ message: 'Produto sem stock disponível.' });
+      return res.status(400).json({ message: 'Produto sem stock disponivel.' });
     }
 
-    // 2. Cria a encomenda com status_id = 1 (Pendente)
+    // Cria a encomenda com status_id = 1 (Pendente)
+    // O stock NAO e decrementado aqui. Sera decrementado quando o pagamento for confirmado.
+    // Isto evita que o stock seja bloqueado para compras nao concluidas.
     const [orderResult] = await connection.query(
       'INSERT INTO FakeOrders (user_id, product_id, tamanho, status_id, data_compra) VALUES (?, ?, ?, 1, NOW())',
       [user_id, product_id, tamanho]
     );
     const orderId = orderResult.insertId;
 
-    // 3. Decrementa o stock do produto (stock = stock - 1)
-    await connection.query(
-      'UPDATE Products SET stock = stock - 1 WHERE product_id = ?',
-      [product_id]
-    );
-
-    // Confirma a transação (commit)
     await connection.commit();
     res.status(201).json({ message: 'Encomenda criada.', order_id: orderId });
   } catch (err) {
-    // Em caso de erro, desfaz todas as alterações (rollback)
     await connection.rollback();
     console.error(err);
     res.status(500).json({ message: 'Erro ao criar encomenda.' });
   } finally {
-    // Liberta a ligação de volta ao pool
     connection.release();
   }
 });
 
 // ================================================================
-// ROTA: Atualizar método de pagamento da encomenda
+// ROTA: Atualizar metodo de pagamento da encomenda
 // ================================================================
 
-// PUT /orders/:order_id/payment – Atualiza o método de pagamento
-// Esta rota é chamada após o pagamento ser bem-sucedido
-// para guardar se foi pago com 'Débito' (Stripe) ou 'PayPal'.
+// PUT /orders/:order_id/payment – Atualiza o metodo de pagamento
+// Chamada apos o pagamento ser bem-sucedido para guardar o metodo usado.
 router.put('/:order_id/payment', async (req, res) => {
-  const { order_id } = req.params;          // ID da encomenda (da URL)
-  const { payment_method } = req.body;      // Método de pagamento (do corpo)
+  const { order_id } = req.params;
+  const { payment_method } = req.body;
 
-  // Validação: método de pagamento é obrigatório
   if (!payment_method) {
-    return res.status(400).json({ message: 'Método de pagamento é obrigatório.' });
+    return res.status(400).json({ message: 'Metodo de pagamento e obrigatorio.' });
   }
 
   try {
-    // Atualiza a coluna payment_method na tabela FakeOrders
     const [result] = await db.promise().query(
       'UPDATE FakeOrders SET payment_method = ? WHERE order_id = ?',
       [payment_method, order_id]
     );
     
-    // Se nenhuma linha foi afetada, a encomenda não existe
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Encomenda não encontrada.' });
+      return res.status(404).json({ message: 'Encomenda nao encontrada.' });
     }
     
-    res.json({ message: 'Método de pagamento atualizado.' });
+    res.json({ message: 'Metodo de pagamento atualizado.' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Erro ao atualizar método de pagamento.' });
+    res.status(500).json({ message: 'Erro ao atualizar metodo de pagamento.' });
   }
 });
 
@@ -120,15 +100,15 @@ router.put('/:order_id/payment', async (req, res) => {
 // ================================================================
 
 // GET /orders/user/:user_id – Retorna todas as encomendas de um utilizador
-// Esta rota é utilizada na página /orders para mostrar o histórico de compras.
-// Inclui dados do produto (nome, preço, imagem) e o estado da encomenda.
+// Utilizada na pagina /orders para mostrar o historico de compras.
+// Inclui dados do produto e o estado da encomenda via JOINs.
 router.get('/user/:user_id', async (req, res) => {
-  const { user_id } = req.params;  // ID do utilizador (da URL)
+  const { user_id } = req.params;
 
   try {
-    // Query com JOINs para obter dados relacionados:
-    // - Products: nome, preço, imagem
-    // - OrderStatus: nome do estado (Pendente, Enviado, Recebido, etc.)
+    // Query com JOINs para obter dados do produto e estado
+    // Products: nome, preco, imagem
+    // OrderStatus: nome do estado (Pendente, Enviado, Recebido)
     const [rows] = await db.promise().query(
       `SELECT fo.*, 
               p.nome AS product_nome, 
@@ -139,7 +119,7 @@ router.get('/user/:user_id', async (req, res) => {
        JOIN Products p ON fo.product_id = p.product_id
        JOIN OrderStatus os ON fo.status_id = os.status_id
        WHERE fo.user_id = ?
-       ORDER BY fo.data_compra DESC`,  // Mais recentes primeiro
+       ORDER BY fo.data_compra DESC`,
       [user_id]
     );
     
@@ -151,17 +131,15 @@ router.get('/user/:user_id', async (req, res) => {
 });
 
 // ================================================================
-// ROTA: Detalhe de uma encomenda específica
+// ROTA: Detalhe de uma encomenda especifica
 // ================================================================
 
 // GET /orders/:order_id – Retorna os detalhes de uma encomenda
-// Esta rota pode ser usada para ver o detalhe de uma encomenda específica
-// (ex: na página de checkout ou na página de encomendas).
+// Utilizada na pagina de checkout ou na pagina de encomendas.
 router.get('/:order_id', async (req, res) => {
-  const { order_id } = req.params;  // ID da encomenda (da URL)
+  const { order_id } = req.params;
 
   try {
-    // Query semelhante à anterior, mas filtrada por order_id
     const [rows] = await db.promise().query(
       `SELECT fo.*, 
               p.nome AS product_nome, 
@@ -175,12 +153,11 @@ router.get('/:order_id', async (req, res) => {
       [order_id]
     );
     
-    // Se não encontrar, retorna 404
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Encomenda não encontrada.' });
+      return res.status(404).json({ message: 'Encomenda nao encontrada.' });
     }
     
-    res.json(rows[0]);  // Retorna apenas o primeiro (e único) resultado
+    res.json(rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erro ao obter encomenda.' });
@@ -188,7 +165,6 @@ router.get('/:order_id', async (req, res) => {
 });
 
 // ================================================================
-// EXPORTAÇÃO DO ROUTER
+// EXPORTACAO DO ROUTER
 // ================================================================
-// Exporta o router para ser utilizado no index.js (montado em /orders)
 module.exports = router;

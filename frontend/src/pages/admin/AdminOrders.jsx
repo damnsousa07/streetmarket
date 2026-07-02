@@ -1,17 +1,11 @@
 // ================================================================
-// ADMINORDERS.JSX – Gestão de encomendas (painel administrativo)
+// ADMINORDERS.JSX – Gestao de encomendas (painel administrativo)
 // ================================================================
-// Este componente permite ao administrador visualizar e atualizar
-// o estado das encomendas (Comprado → Enviado → Recebido).
-// Inclui:
-// - Pesquisa (nome, email, produto, ID)
-// - Filtro por estado
-// - Modal de confirmação antes de atualizar
-// - Modal de sucesso após atualização
-// - Modal de aviso (quando o estado não muda)
+// Permite ao administrador visualizar e atualizar o estado das encomendas
+// (Comprado -> Enviado -> Recebido).
+// Inclui pesquisa, filtro por estado e modais de confirmacao e sucesso.
 // ================================================================
 
-// Importação dos módulos necessários
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getAdminOrders, updateAdminOrderStatus } from '../../api/admin';
 
@@ -19,15 +13,15 @@ import { getAdminOrders, updateAdminOrderStatus } from '../../api/admin';
 // CONSTANTES
 // ================================================================
 
-// Estados possíveis para uma encomenda
+// Estados possiveis para uma encomenda
 const STATUS_OPTIONS = [
-    { id: 1, label: 'Comprado' },   // Pendente
-    { id: 2, label: 'Enviado' },    // Em trânsito
-    { id: 3, label: 'Recebido' },   // Entregue
+    { id: 1, label: 'Comprado' },
+    { id: 2, label: 'Enviado' },
+    { id: 3, label: 'Recebido' },
 ];
 
 // ================================================================
-// FUNÇÃO AUXILIAR: Verificar chave de administrador
+// FUNCAO AUXILIAR: Verificar chave de administrador
 // ================================================================
 
 function requireAdminKey() {
@@ -40,25 +34,24 @@ function requireAdminKey() {
 // ================================================================
 
 export default function AdminOrders({ embedded = false }) {
-    // ----- ESTADOS DA LISTA -----
+    // Estados da lista
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [savingId, setSavingId] = useState(null);              // ID da encomenda a guardar
-    const [draftStatus, setDraftStatus] = useState({});         // Estado temporário (antes de guardar)
+    const [savingId, setSavingId] = useState(null);
+    const [draftStatus, setDraftStatus] = useState({});
 
-    // ----- ESTADO DOS FILTROS -----
+    // Estado dos filtros
     const [filters, setFilters] = useState({
         search: '',
         status_id: '',
     });
 
-    // ----- REFERÊNCIAS -----
+    // Referencias
     const searchInputRef = useRef(null);
     const debounceTimer = useRef(null);
 
-    // ----- MODAIS -----
-    // Modal de confirmação
+    // Modais
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [confirmData, setConfirmData] = useState({
         orderId: null,
@@ -67,20 +60,17 @@ export default function AdminOrders({ embedded = false }) {
         newStatusId: null,
     });
 
-    // Modal de sucesso
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
 
-    // Modal de aviso (centralizado)
     const [showWarningModal, setShowWarningModal] = useState(false);
     const [warningMessage, setWarningMessage] = useState('');
 
     // ================================================================
-    // FUNÇÃO: Buscar encomendas
+    // FUNCAO: Buscar encomendas
     // ================================================================
 
     const fetchOrders = useCallback(async (search, status) => {
-        // Verifica se tem chave de administrador
         if (!requireAdminKey()) {
             setError('Sem admin key.');
             setLoading(false);
@@ -88,14 +78,12 @@ export default function AdminOrders({ embedded = false }) {
         }
         try {
             setLoading(true);
-            // Constrói os parâmetros da query string
             const params = new URLSearchParams();
             if (search) params.append('search', search);
             if (status) params.append('status_id', status);
-            // Chama a API
             const data = await getAdminOrders(params.toString());
             setOrders(data);
-            // Inicializa o estado temporário com os estados atuais
+            // Inicializa o estado temporario com os estados atuais
             const next = {};
             for (const o of data) next[o.order_id] = o.status_id;
             setDraftStatus(next);
@@ -111,7 +99,6 @@ export default function AdminOrders({ embedded = false }) {
     // EFFECTS: Carregar dados
     // ================================================================
 
-    // Carrega as encomendas quando os filtros mudarem
     useEffect(() => {
         fetchOrders(filters.search, filters.status_id);
     }, [filters, fetchOrders]);
@@ -120,7 +107,7 @@ export default function AdminOrders({ embedded = false }) {
     // HANDLERS: Filtros
     // ================================================================
 
-    // Handler para pesquisa com debounce (500ms)
+    // Handler para pesquisa com debounce de 500ms
     const handleSearchChange = () => {
         const value = searchInputRef.current?.value || '';
         if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -129,13 +116,11 @@ export default function AdminOrders({ embedded = false }) {
         }, 500);
     };
 
-    // Handler para mudança no filtro de estado
     const handleFilterChange = (e) => {
         const { name, value } = e.target;
         setFilters(prev => ({ ...prev, [name]: value }));
     };
 
-    // Força a atualização manual (recarrega com os filtros atuais)
     const handleRefresh = () => {
         const currentSearch = searchInputRef.current?.value || '';
         const currentStatus = filters.status_id;
@@ -147,12 +132,12 @@ export default function AdminOrders({ embedded = false }) {
     // HANDLERS: Estado das encomendas
     // ================================================================
 
-    // Atualiza o estado temporário quando o utilizador muda o select
+    // Atualiza o estado temporario quando o utilizador muda o select
     const handleOrderStatusChange = (orderId, newStatusId) => {
         setDraftStatus(prev => ({ ...prev, [orderId]: newStatusId }));
     };
 
-    // Abre o modal de confirmação
+    // Abre o modal de confirmacao
     const openConfirmModal = (orderId, newStatusId) => {
         const currentOrder = orders.find(o => o.order_id === orderId);
         if (!currentOrder) return;
@@ -162,7 +147,7 @@ export default function AdminOrders({ embedded = false }) {
 
         // Se o estado for o mesmo, mostra aviso
         if (currentOrder.status_id === newStatusId) {
-            setWarningMessage(`A encomenda #${orderId} já está no estado "${currentStatus}".`);
+            setWarningMessage(`A encomenda #${orderId} ja esta no estado "${currentStatus}".`);
             setShowWarningModal(true);
             return;
         }
@@ -176,17 +161,16 @@ export default function AdminOrders({ embedded = false }) {
         setShowConfirmModal(true);
     };
 
-    // Confirma a atualização do estado
+    // Confirma a atualizacao do estado
     const handleConfirm = async () => {
         const { orderId, newStatusId } = confirmData;
         if (!orderId || newStatusId == null) return;
 
         try {
             setSavingId(orderId);
-            // Chama a API para atualizar o estado
             await updateAdminOrderStatus(orderId, newStatusId);
 
-            // Atualiza a lista local (para evitar recarregar tudo)
+            // Atualiza a lista local
             setOrders(prev =>
                 prev.map(order =>
                     order.order_id === orderId
@@ -205,12 +189,10 @@ export default function AdminOrders({ embedded = false }) {
         }
     };
 
-    // Cancela a confirmação
     const handleCancel = () => {
         setShowConfirmModal(false);
     };
 
-    // Função chamada ao clicar em "Guardar"
     const handleSave = (orderId) => {
         const newStatusId = draftStatus[orderId];
         if (newStatusId == null) return;
@@ -225,7 +207,7 @@ export default function AdminOrders({ embedded = false }) {
         embedded ? <div>{children}</div> : <div className="container" style={{ padding: '32px 0' }}>{children}</div>;
 
     // ================================================================
-    // RENDERIZAÇÃO CONDICIONAL (sem chave admin)
+    // RENDERIZACAO CONDICIONAL (sem chave admin)
     // ================================================================
 
     if (!requireAdminKey()) {
@@ -238,12 +220,12 @@ export default function AdminOrders({ embedded = false }) {
     }
 
     // ================================================================
-    // RENDERIZAÇÃO PRINCIPAL
+    // RENDERIZACAO PRINCIPAL
     // ================================================================
 
     return (
         <Wrapper>
-            {/* ----- CABEÇALHO (apenas se não estiver embutido) ----- */}
+            {/* Cabecalho e filtros (apenas se nao estiver embutido) */}
             {!embedded && (
                 <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
@@ -258,9 +240,7 @@ export default function AdminOrders({ embedded = false }) {
                         </button>
                     </div>
 
-                    {/* Barra de filtros */}
                     <div style={{ display: 'flex', gap: '12px', margin: '20px 0', flexWrap: 'wrap', alignItems: 'center' }}>
-                        {/* Pesquisa por texto */}
                         <input
                             type="text"
                             ref={searchInputRef}
@@ -270,7 +250,6 @@ export default function AdminOrders({ embedded = false }) {
                             className="input"
                             style={{ flex: 2, minWidth: '200px' }}
                         />
-                        {/* Seletor de estado */}
                         <select
                             name="status_id"
                             value={filters.status_id}
@@ -287,11 +266,11 @@ export default function AdminOrders({ embedded = false }) {
                 </>
             )}
 
-            {/* ----- ESTADOS DE CARREGAMENTO E ERRO ----- */}
+            {/* Estados de carregamento e erro */}
             {loading && <p style={{ color: 'var(--muted)', marginTop: 16 }}>A carregar...</p>}
             {error && <p style={{ color: 'salmon', marginTop: 16 }}>{error}</p>}
 
-            {/* ----- LISTA DE ENCOMENDAS ----- */}
+            {/* Lista de encomendas */}
             {!loading && !error && (
                 <>
                     {orders.length === 0 ? (
@@ -311,7 +290,7 @@ export default function AdminOrders({ embedded = false }) {
                                         gap: '12px'
                                     }}
                                 >
-                                    {/* Informações da encomenda */}
+                                    {/* Informacoes da encomenda */}
                                     <div style={{ flex: 2, minWidth: '200px' }}>
                                         <div><strong>#{order.order_id}</strong> – {new Date(order.data_compra).toLocaleString()}</div>
                                         <div>{order.user_nome} ({order.email})</div>
@@ -350,7 +329,7 @@ export default function AdminOrders({ embedded = false }) {
             {/* MODAIS */}
             {/* ================================================================ */}
 
-            {/* Modal de confirmação de alteração */}
+            {/* Modal de confirmacao */}
             {showConfirmModal && (
                 <div
                     style={{
@@ -381,9 +360,9 @@ export default function AdminOrders({ embedded = false }) {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div style={{ fontSize: '36px', marginBottom: '8px' }}>⚠️</div>
-                        <h3 style={{ margin: '0 0 8px', color: '#1a1a1a' }}>Confirmar alteração</h3>
+                        <h3 style={{ margin: '0 0 8px', color: '#1a1a1a' }}>Confirmar alteracao</h3>
                         <p style={{ color: '#555', fontSize: '15px', lineHeight: '1.5', marginBottom: '20px' }}>
-                            Deseja mudar o estado da encomenda nº <strong>{confirmData.orderId}</strong> do estado{' '}
+                            Deseja mudar o estado da encomenda n. <strong>{confirmData.orderId}</strong> do estado{' '}
                             <strong>"{confirmData.currentStatus}"</strong> para <strong>"{confirmData.newStatus}"</strong>?
                         </p>
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
@@ -474,7 +453,7 @@ export default function AdminOrders({ embedded = false }) {
                 </div>
             )}
 
-            {/* Modal de aviso (estado não mudou) */}
+            {/* Modal de aviso */}
             {showWarningModal && (
                 <div
                     style={{

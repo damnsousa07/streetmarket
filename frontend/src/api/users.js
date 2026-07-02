@@ -1,46 +1,44 @@
 // ================================================================
-// AUTH.JS – Serviço de autenticação (frontend)
+// AUTH.JS – Servico de autenticacao (frontend)
 // ================================================================
-// Este ficheiro contém as funções para login e registo de utilizadores.
-// Comunica com as rotas de autenticação do backend (/users).
+// Contem as funcoes para login e registo de utilizadores.
+// Comunica com as rotas de autenticacao do backend (/users).
 // Utiliza o cliente HTTP (Axios) configurado em client.js.
 // ================================================================
 
-// Importação do cliente HTTP (Axios) configurado
 import { api } from './client';
 
 // ================================================================
-// FUNÇÃO: Login
+// FUNCAO: Login
 // ================================================================
 
 // POST /users/login – Autentica o utilizador
-// Parâmetros:
+// Parametros:
 //   email - Email do utilizador
 //   password - Password do utilizador
 // Retorna: { user_id, nome, email, tipo }
 export async function loginUser(email, password) {
-    // Faz a requisição POST para /users/login
     const res = await api.post('/users/login', { email, password });
     return res.data;
 }
 
 // ================================================================
-// FUNÇÃO: Registo de novo utilizador
+// FUNCAO: Registo de novo utilizador
 // ================================================================
 
 // POST /users/register – Cria uma nova conta
-// Todos os campos são obrigatórios.
-// Após o registo, é enviado um código de verificação por email.
-// Parâmetros:
+// Todos os campos sao obrigatorios.
+// Apos o registo, e enviado um codigo de verificacao por email.
+// Parametros:
 //   primeiro_nome - Primeiro nome do utilizador
-//   ultimo_nome - Último nome do utilizador
-//   email - Email do utilizador (único)
-//   password - Password (mínimo 8 caracteres)
+//   ultimo_nome - Ultimo nome do utilizador
+//   email - Email do utilizador (unico)
+//   password - Password (minimo 8 caracteres)
 //   morada - Morada completa
-//   codigo_postal - Código postal (formato XXXX-XXX)
-//   telefone - Número de telefone (9 dígitos, começa por 9)
-//   distrito - Distrito de residência
-//   concelho - Concelho de residência
+//   codigo_postal - Codigo postal (formato XXXX-XXX)
+//   telefone - Numero de telefone (9 digitos, comeca por 9)
+//   distrito - Distrito de residencia
+//   concelho - Concelho de residencia
 export async function registerUser({
     primeiro_nome,
     ultimo_nome,
@@ -53,19 +51,19 @@ export async function registerUser({
     concelho
 }) {
     // Monta o payload com todos os campos exigidos pelo backend
+    // Aplica trim() para remover espacos em branco desnecessarios
     const payload = {
         primeiro_nome: primeiro_nome.trim(),
         ultimo_nome: ultimo_nome.trim(),
         email: email.trim(),
         password: password,
         morada: morada.trim(),
-        codigo_postal: codigo_postal.trim(), // formato XXXX-XXX
-        telefone: telefone.trim(),           // 9 dígitos, começa por 9
+        codigo_postal: codigo_postal.trim(),
+        telefone: telefone.trim(),
         distrito: distrito.trim(),
         concelho: concelho.trim()
     };
 
-    // Faz a requisição POST para /users/register
     const res = await api.post('/users/register', payload);
-    return res.data; // { message: 'Registo efetuado! Verifica o teu email...' }
+    return res.data;
 }

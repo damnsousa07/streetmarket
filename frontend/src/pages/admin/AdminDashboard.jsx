@@ -1,20 +1,15 @@
 // ================================================================
-// ADMINDASHBOARD.JSX – Painel de administração (dashboard)
+// ADMINDASHBOARD.JSX – Painel de administracao (dashboard)
 // ================================================================
-// Este componente é a página inicial do painel administrativo.
-// Exibe links para as diferentes secções de gestão:
-// - Encomendas
-// - Produtos
-// - Categorias
-// - Notificações
-// Apenas utilizadores com chave de administrador têm acesso.
+// Pagina inicial do painel administrativo.
+// Exibe links para as seccoes de gestao: Encomendas, Produtos, Categorias e Notificacoes.
+// Apenas utilizadores com chave de administrador tem acesso.
 // ================================================================
 
-// Importação dos módulos necessários
 import { Link } from 'react-router-dom';
 
 // ================================================================
-// FUNÇÃO AUXILIAR: Verificar chave de administrador
+// FUNCAO AUXILIAR: Verificar chave de administrador
 // ================================================================
 
 function requireAdminKey() {
@@ -27,8 +22,7 @@ function requireAdminKey() {
 // ================================================================
 
 export default function AdminDashboard() {
-    // ----- RENDERIZAÇÃO CONDICIONAL (sem chave admin) -----
-    // Se não houver chave, mostra mensagem de erro
+    // Renderizacao condicional: se nao houver chave admin, mostra erro
     if (!requireAdminKey()) {
         return (
             <div className="container" style={{ padding: '32px 0' }}>
@@ -40,42 +34,34 @@ export default function AdminDashboard() {
         );
     }
 
-    // ----- RENDERIZAÇÃO PRINCIPAL (com chave admin) -----
+    // Renderizacao principal com os links para as seccoes admin
     return (
         <div className="container" style={{ padding: '32px 0' }}>
-            {/* Cabeçalho */}
             <h1 style={{ marginTop: 0 }}>Admin</h1>
             <p style={{ color: 'var(--muted)', marginTop: 6 }}>
-                Escolhe uma secção.
+                Escolhe uma secao.
             </p>
 
-            {/* Links para as secções de administração */}
+            {/* Links para as seccoes de administracao */}
             <div style={{ display: 'flex', gap: 12, marginTop: 16, flexWrap: 'wrap' }}>
-                {/* Link para gestão de encomendas */}
                 <Link className="btn btn-primary" to="/admin/orders">
                     Encomendas
                 </Link>
-                
-                {/* Link para gestão de produtos */}
                 <Link className="btn btn-primary" to="/admin/products">
                     Produtos
                 </Link>
-
-                {/* Link para gestão de categorias */}
                 <Link className="btn btn-primary" to="/admin/categories">
                     Categorias
                 </Link>
-
-                {/* Link para gestão de notificações */}
                 <Link className="btn btn-primary" to="/admin/notifications">
-                    Notificações
+                    Notificacoes
                 </Link>
             </div>
 
             {/* Nota informativa sobre a estrutura */}
             <div style={{ marginTop: 16 }} className="card">
                 <div style={{ padding: 14, color: 'var(--muted)' }}>
-                    Nota: já tens as páginas separadas a funcionar. A seguir, juntamos tudo numa única página com scroll
+                    Nota: ja tens as paginas separadas a funcionar. A seguir, juntamos tudo numa unica pagina com scroll
                     sem rebentar a app.
                 </div>
             </div>

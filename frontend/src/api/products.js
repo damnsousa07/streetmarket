@@ -1,30 +1,31 @@
 // ================================================================
-// PRODUCTS.JS – Serviço de API para produtos
+// PRODUCTS.JS – Servico de API para produtos
 // ================================================================
-// Este ficheiro contém funções para obter produtos, detalhes,
-// marcas e pesquisar produtos com filtros.
+// Contem funcoes para obter produtos, detalhes, marcas e pesquisar produtos com filtros.
 // Utiliza o cliente HTTP (Axios) configurado em client.js.
 // ================================================================
 
-// Importação do cliente HTTP (Axios) configurado
 import { api } from './client';
 
 // ================================================================
-// FUNÇÃO: Obter produtos com paginação e filtros
+// FUNCAO: Obter produtos com paginacao e filtros
 // ================================================================
 
 // GET /products – Retorna uma lista paginada de produtos
-// Parâmetros (filters):
-//   page - Número da página (default: 1)
-//   limit - Produtos por página (default: 12)
+// Parametros (filters):
+//   page - Numero da pagina (default: 1)
+//   limit - Produtos por pagina (default: 12)
 //   q - Termo de pesquisa (nome ou marca)
 //   category_id - ID da categoria
 //   brand - Marca
-//   gender - Género (Masculino, Feminino, Unisexo)
-//   min_price - Preço mínimo
-//   max_price - Preço máximo
-//   sort - Ordenação (ex: 'price_asc', 'name_desc')
+//   gender - Genero (Masculino, Feminino, Unisexo)
+//   min_price - Preco minimo
+//   max_price - Preco maximo
+//   sort - Ordenacao (ex: 'price_asc', 'name_desc')
+//   in_stock - Filtrar apenas produtos em stock (true/false)
 export async function getProducts(filters = {}) {
+  console.log('getProducts - FILTROS RECEBIDOS:', filters);
+  
   const params = new URLSearchParams();
   if (filters.page) params.append('page', filters.page);
   if (filters.limit) params.append('limit', filters.limit);
@@ -35,19 +36,29 @@ export async function getProducts(filters = {}) {
   if (filters.min_price) params.append('min_price', filters.min_price);
   if (filters.max_price) params.append('max_price', filters.max_price);
   if (filters.sort) params.append('sort', filters.sort);
+  if (filters.in_stock !== undefined && filters.in_stock !== null) {
+    params.append('in_stock', filters.in_stock);
+    console.log('getProducts - in_stock ADICIONADO AO URL:', filters.in_stock);
+  } else {
+    console.log('getProducts - in_stock NAO FOI ADICIONADO (undefined ou null)');
+  }
 
-  const response = await api.get(`/products?${params.toString()}`);
-  return response.data; // { data: [...], meta: { total, totalPages, currentPage, limit } }
+  const url = `/products?${params.toString()}`;
+  console.log('getProducts - URL FINAL:', url);
+  
+  const response = await api.get(url);
+  console.log('getProducts - RESPOSTA:', response.data);
+  return response.data;
 }
 
 // ================================================================
-// FUNÇÃO: Obter detalhes de um produto específico
+// FUNCAO: Obter detalhes de um produto especifico
 // ================================================================
 
 // GET /products/:id – Retorna os detalhes de um produto
-// Parâmetros:
+// Parametros:
 //   id - ID do produto
-//   userId - ID do utilizador (opcional, para verificar permissão de review)
+//   userId - ID do utilizador (opcional, para verificar permissao de review)
 export async function getProductById(id, userId = null) {
   const params = new URLSearchParams();
   if (userId) {
@@ -55,26 +66,26 @@ export async function getProductById(id, userId = null) {
   }
   const url = `/products/${id}${params.toString() ? `?${params.toString()}` : ''}`;
   const response = await api.get(url);
-  return response.data; // Produto com imagens, canReview, userReview
+  return response.data;
 }
 
 // ================================================================
-// FUNÇÃO: Obter marcas distintas
+// FUNCAO: Obter marcas distintas
 // ================================================================
 
 // GET /products/brands – Retorna todas as marcas distintas
 // Utilizado para popular os dropdowns de filtro de marcas.
 export async function getBrands() {
   const response = await api.get('/products/brands');
-  return response.data; // array de strings (nomes das marcas)
+  return response.data;
 }
 
 // ================================================================
-// FUNÇÃO: Pesquisar produtos (alias)
+// FUNCAO: Pesquisar produtos (alias)
 // ================================================================
 
 // Alias para getProducts (mantido para compatibilidade)
-// Algumas partes do código podem usar searchProducts em vez de getProducts.
 export async function searchProducts(filters) {
+  console.log('searchProducts - FILTROS:', filters);
   return getProducts(filters);
 }

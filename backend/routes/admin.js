@@ -1,71 +1,71 @@
 // ================================================================
-// ADMIN.JS – Rotas de administração
+// ADMIN.JS – Rotas de administracao
 // ================================================================
-// Este ficheiro contém todas as rotas protegidas para a gestão 
-// da loja (categorias, produtos, encomendas e notificações).
+// Contem todas as rotas protegidas para gestao da loja.
 // Apenas utilizadores com a chave de administrador correta podem aceder.
 // ================================================================
 
-// Importação dos módulos necessários
-const express = require('express');        // Framework para construir a API
-const router = express.Router();           // Cria um router para definir as rotas
-const multer = require('multer');          // Middleware para upload de ficheiros
-const path = require('path');              // Manipulação de caminhos de ficheiros
-const fs = require('fs');                  // Manipulação do sistema de ficheiros
-const db = require('../db');               // Ligação à base de dados MySQL
-const { sendReviewRequestEmail } = require('../services/emailservice'); // Envio de emails
+// Importacao dos modulos necessarios
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const db = require('../db');
+const { sendReviewRequestEmail } = require('../services/emailservice');
 
 // ================================================================
-// CONFIGURAÇÃO DO UPLOAD DE IMAGENS (MULTER)
+// CONFIGURACAO DO UPLOAD DE IMAGENS (MULTER)
 // ================================================================
 
-// Define os diretórios onde as imagens serão guardadas
-const uploadDir = path.join(__dirname, '../uploads');          // Pasta principal de uploads
-const categoriesDir = path.join(uploadDir, 'categories');      // Pasta específica para categorias
+// Define os diretorios onde as imagens serao guardadas
+const uploadDir = path.join(__dirname, '../uploads');
+const categoriesDir = path.join(uploadDir, 'categories');
 
-// Cria as pastas se não existirem (recursive: true cria todos os níveis necessários)
+// Cria as pastas se nao existirem
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 if (!fs.existsSync(categoriesDir)) fs.mkdirSync(categoriesDir, { recursive: true });
 
-// Configuração do armazenamento do multer (define destino e nome do ficheiro)
+// Configuracao do armazenamento do multer
+// Define destino e nome do ficheiro consoante o tipo de upload
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     // Se o pedido for para categorias, guarda na pasta categories
     if (req.path.includes('/Categories')) {
       cb(null, categoriesDir);
     } else {
-      cb(null, uploadDir);  // Caso contrário, guarda na pasta principal
+      cb(null, uploadDir);
     }
   },
   filename: (req, file, cb) => {
-    // Gera um nome único para o ficheiro: timestamp + número aleatório + extensão original
+    // Gera um nome unico: timestamp + numero aleatorio + extensao original
+    // Prefixo 'cat-' para categorias, 'prod-' para produtos
     const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
     const ext = path.extname(file.originalname);
-    // Prefixo 'cat-' para categorias, 'prod-' para produtos
     const prefix = req.path.includes('/Categories') ? 'cat-' : 'prod-';
     cb(null, `${prefix}${unique}${ext}`);
   }
 });
 
-// Cria o middleware multer com as configurações definidas e limite de 5 MB por imagem
+// Cria o middleware multer com limite de 5 MB por imagem
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 // ================================================================
-// MIDDLEWARE DE AUTENTICAÇÃO ADMIN
+// MIDDLEWARE DE AUTENTICACAO ADMIN
 // ================================================================
 
-// Função middleware que verifica se o pedido contém a chave de administrador correta
-// Esta função é executada antes de qualquer rota protegida
+// Funcao middleware que verifica se o pedido contem a chave de administrador correta
+// Esta funcao e executada antes de qualquer rota protegida
 function requireAdmin(req, res, next) {
-  // Obtém a chave do cabeçalho 'x-admin-key'
+  // Obtem a chave do cabecalho 'x-admin-key'
   const key = req.headers['x-admin-key'];
   
-  // Verifica se a variável de ambiente ADMIN_KEY está definida
+  // Verifica se a variavel de ambiente ADMIN_KEY esta definida
   if (!process.env.ADMIN_KEY) {
-    return res.status(500).json({ message: 'ADMIN_KEY não definido no .env' });
+    return res.status(500).json({ message: 'ADMIN_KEY nao definido no .env' });
   }
   
   // Verifica se a chave foi enviada e se coincide com a definida no .env
@@ -73,11 +73,11 @@ function requireAdmin(req, res, next) {
     return res.status(401).json({ message: 'Acesso negado (admin).' });
   }
   
-  // Se a chave estiver correta, prossegue para a próxima função/middleware
+  // Se a chave estiver correta, prossegue para a proxima funcao
   next();
 }
 
-// Aplica o middleware de autenticação a todas as rotas definidas neste router
+// Aplica o middleware de autenticacao a todas as rotas definidas neste router
 router.use(requireAdmin);
 
 // ================================================================
@@ -85,23 +85,23 @@ router.use(requireAdmin);
 // ================================================================
 
 // GET /admin/Categories – Listar todas as categorias
-// Permite pesquisa por nome e ordenação (A→Z ou Z→A)
+// Permite pesquisa por nome e ordenacao (A-Z ou Z-A)
 router.get('/Categories', async (req, res) => {
-  // Obtém o termo de pesquisa e a ordenação da query string
+  // Obtem o termo de pesquisa e a ordenacao da query string
   const search = req.query.search ? `%${req.query.search}%` : null;
   const sort = req.query.sort === 'name_desc' ? 'DESC' : 'ASC';
   
-  // Query base: seleciona todas as categorias
+  // Query base que seleciona todas as categorias
   let sql = 'SELECT * FROM Categories WHERE 1=1';
   const params = [];
   
-  // Se houver termo de pesquisa, adiciona a condição LIKE
+  // Se houver termo de pesquisa, adiciona a condicao LIKE
   if (search) {
     sql += ` AND nome LIKE ?`;
     params.push(search);
   }
   
-  // Adiciona a ordenação dinâmica
+  // Adiciona a ordenacao dinamica
   sql += ` ORDER BY nome ${sort}`;
   
   try {
@@ -115,24 +115,24 @@ router.get('/Categories', async (req, res) => {
 
 // POST /admin/Categories – Criar uma nova categoria (com imagem opcional)
 router.post('/Categories', upload.single('image'), async (req, res) => {
-  // Logs para depuração
-  console.log('🔍 req.file:', req.file);
-  console.log('🔍 req.body:', req.body);
+  // Logs para depuracao
+  console.log('req.file:', req.file);
+  console.log('req.body:', req.body);
 
   // Garante que req.body existe
   req.body = req.body || {};
   const { nome, descricao } = req.body;
   
-  // Validação: nome é obrigatório
-  if (!nome) return res.status(400).json({ message: 'Nome é obrigatório.' });
+  // Validacao: nome e obrigatorio
+  if (!nome) return res.status(400).json({ message: 'Nome e obrigatorio.' });
 
   // Se foi enviada uma imagem, guarda o caminho
   let imageUrl = null;
   if (req.file) {
     imageUrl = `/uploads/categories/${req.file.filename}`;
-    console.log('✅ Ficheiro guardado:', imageUrl);
+    console.log('Ficheiro guardado:', imageUrl);
   } else {
-    console.log('❌ Nenhum ficheiro recebido.');
+    console.log('Nenhum ficheiro recebido.');
   }
 
   try {
@@ -159,28 +159,28 @@ router.put('/Categories/:id', upload.single('image'), async (req, res) => {
   const { id } = req.params;
   const { nome, descricao } = req.body;
   
-  // Validação: nome é obrigatório
-  if (!nome) return res.status(400).json({ message: 'Nome é obrigatório.' });
+  // Validacao: nome e obrigatorio
+  if (!nome) return res.status(400).json({ message: 'Nome e obrigatorio.' });
 
   // Se foi enviada uma nova imagem, guarda o caminho
   let imageUrl = null;
   if (req.file) {
     imageUrl = `/uploads/categories/${req.file.filename}`;
-    console.log('✅ Nova imagem guardada:', imageUrl);
+    console.log('Nova imagem guardada:', imageUrl);
 
-    // Apaga a imagem antiga (se existir)
+    // Apaga a imagem antiga do disco (se existir)
     const [old] = await db.promise().query('SELECT image_url FROM Categories WHERE category_id = ?', [id]);
     if (old.length > 0 && old[0].image_url) {
       const oldPath = path.join(__dirname, '..', old[0].image_url);
       if (fs.existsSync(oldPath)) {
         fs.unlinkSync(oldPath);
-        console.log('🗑️ Imagem antiga apagada:', oldPath);
+        console.log('Imagem antiga apagada:', oldPath);
       }
     }
   }
 
   try {
-    // Constrói a query dinamicamente (inclui a imagem apenas se foi enviada)
+    // Constroi a query dinamicamente (inclui a imagem apenas se foi enviada)
     let sql = 'UPDATE Categories SET nome = ?, descricao = ?';
     const params = [nome, descricao || null];
     if (imageUrl) {
@@ -192,7 +192,7 @@ router.put('/Categories/:id', upload.single('image'), async (req, res) => {
 
     const [result] = await db.promise().query(sql, params);
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Categoria não encontrada.' });
+      return res.status(404).json({ message: 'Categoria nao encontrada.' });
     }
 
     res.json({ message: 'Categoria atualizada.' });
@@ -206,28 +206,28 @@ router.put('/Categories/:id', upload.single('image'), async (req, res) => {
 router.delete('/Categories/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // Verifica se existem produtos associados (impede a exclusão se houver)
+    // Verifica se existem produtos associados para impedir a exclusao
     const [check] = await db.promise().query(
       'SELECT COUNT(*) AS total FROM Products WHERE category_id = ?',
       [id]
     );
     if (check[0].total > 0) {
-      return res.status(400).json({ message: 'Não é possível apagar: existem produtos associados.' });
+      return res.status(400).json({ message: 'Nao e possivel apagar: existem produtos associados.' });
     }
 
-    // Busca a imagem antes de apagar (para remover o ficheiro)
+    // Busca a imagem antes de apagar para remover o ficheiro
     const [old] = await db.promise().query('SELECT image_url FROM Categories WHERE category_id = ?', [id]);
     const [result] = await db.promise().query('DELETE FROM Categories WHERE category_id = ?', [id]);
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Categoria não encontrada.' });
+      return res.status(404).json({ message: 'Categoria nao encontrada.' });
     }
 
-    // Apaga o ficheiro de imagem se existir
+    // Apaga o ficheiro de imagem do disco se existir
     if (old.length > 0 && old[0].image_url) {
       const oldPath = path.join(__dirname, '..', old[0].image_url);
       if (fs.existsSync(oldPath)) {
         fs.unlinkSync(oldPath);
-        console.log('🗑️ Imagem apagada:', oldPath);
+        console.log('Imagem apagada:', oldPath);
       }
     }
 
@@ -239,17 +239,17 @@ router.delete('/Categories/:id', async (req, res) => {
 });
 
 // ================================================================
-// ROTAS DE PRODUTOS (CRUD com imagens, stock, género e paginação)
+// ROTAS DE PRODUTOS (CRUD com imagens, stock, genero e paginacao)
 // ================================================================
 
-// GET /admin/Products – Listar produtos com paginação e filtros
+// GET /admin/Products – Listar produtos com paginacao e filtros
 router.get('/Products', async (req, res) => {
-  // Paginação: página atual e limite por página
+  // Paginacao: pagina atual e limite por pagina
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 12;
   const offset = (page - 1) * limit;
 
-  // Filtros
+  // Filtros recebidos da query string
   const search = req.query.search ? `%${req.query.search}%` : null;
   const category_id = req.query.category_id ? parseInt(req.query.category_id) : null;
   const brand = req.query.brand || null;
@@ -257,7 +257,7 @@ router.get('/Products', async (req, res) => {
   const max_price = req.query.max_price ? parseFloat(req.query.max_price) : null;
   const sort = req.query.sort || 'id_desc';
 
-  // Query base com junção à tabela Categories para obter o nome da categoria
+  // Query base com juncao a tabela Categories para obter o nome da categoria
   let sql = `
     SELECT p.*, c.nome AS category_nome
     FROM Products p
@@ -266,7 +266,7 @@ router.get('/Products', async (req, res) => {
   `;
   const params = [];
 
-  // Adiciona condições de filtro conforme os parâmetros fornecidos
+  // Adiciona condicoes de filtro conforme os parametros fornecidos
   if (search) {
     sql += ` AND (p.nome LIKE ? OR p.marca LIKE ?)`;
     params.push(search, search);
@@ -288,7 +288,7 @@ router.get('/Products', async (req, res) => {
     params.push(max_price);
   }
 
-  // Ordenação
+  // Ordenacao dinamica conforme o parametro sort
   switch (sort) {
     case 'name_asc': sql += ` ORDER BY p.nome ASC`; break;
     case 'name_desc': sql += ` ORDER BY p.nome DESC`; break;
@@ -297,7 +297,7 @@ router.get('/Products', async (req, res) => {
     default: sql += ` ORDER BY p.product_id DESC`;
   }
 
-  // Contagem total (para calcular o número de páginas)
+  // Contagem total para calcular o numero de paginas
   const countSql = sql.replace(/ORDER BY.*$/, '');
   const [countResult] = await db.promise().query(countSql, params);
   const total = countResult.length;
@@ -308,7 +308,7 @@ router.get('/Products', async (req, res) => {
 
   const [rows] = await db.promise().query(sql, params);
 
-  // Busca a imagem principal de cada produto
+  // Busca a imagem principal de cada produto na tabela ProductsImages
   const imagePromises = rows.map(async (product) => {
     const [images] = await db.promise().query(
       'SELECT image_url FROM ProductsImages WHERE product_id = ? ORDER BY order_index ASC, is_primary DESC, created_at ASC LIMIT 1',
@@ -318,7 +318,7 @@ router.get('/Products', async (req, res) => {
   });
   await Promise.all(imagePromises);
 
-  // Calcula o total de páginas
+  // Calcula o total de paginas
   const totalPages = Math.ceil(total / limit);
 
   res.json({
@@ -332,7 +332,7 @@ router.get('/Products', async (req, res) => {
   });
 });
 
-// GET /admin/Products/:id – Buscar um produto específico (com imagens)
+// GET /admin/Products/:id – Buscar um produto especifico com imagens
 router.get('/Products/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -345,11 +345,11 @@ router.get('/Products/:id', async (req, res) => {
       [id]
     );
     if (products.length === 0) {
-      return res.status(404).json({ message: 'Produto não encontrado.' });
+      return res.status(404).json({ message: 'Produto nao encontrado.' });
     }
     const product = products[0];
 
-    // Busca todas as imagens do produto (ordenadas por ordem definida)
+    // Busca todas as imagens do produto ordenadas por ordem definida
     const [images] = await db.promise().query(
       'SELECT image_id, image_url, is_primary, order_index FROM ProductsImages WHERE product_id = ? ORDER BY order_index ASC, is_primary DESC, created_at ASC',
       [id]
@@ -375,46 +375,66 @@ router.get('/Brands', async (req, res) => {
   }
 });
 
-// POST /admin/Products – Criar um novo produto (com imagens)
+// POST /admin/Products – Criar um novo produto com imagens
+// Permite produtos com mesmo nome desde que a marca seja diferente
 router.post('/Products', upload.array('images', 6), async (req, res) => {
-  // Logs para depuração
+  // Logs para depuracao
   console.log('POST /admin/Products - req.body:', req.body);
   console.log('POST /admin/Products - req.files:', req.files ? req.files.length : 0);
 
   const { nome, marca, preco, descricao, category_id, tamanhos, gender, stock } = req.body;
 
-  // Validação dos campos obrigatórios
+  // Validacao dos campos obrigatorios
   if (!nome || !marca || !preco || !category_id) {
     return res.status(400).json({
-      message: 'nome, marca, preco e category_id são obrigatórios.',
+      message: 'nome, marca, preco e category_id sao obrigatorios.',
       received: { nome, marca, preco, category_id }
     });
   }
 
-  // Obtém uma ligação à base de dados para usar transação
+  // Validacao: verifica se ja existe produto com mesmo nome E mesma marca
+  try {
+    const [existing] = await db.promise().query(
+      'SELECT product_id, nome, marca FROM Products WHERE nome = ? AND marca = ?',
+      [nome, marca]
+    );
+    
+    if (existing.length > 0) {
+      return res.status(400).json({
+        message: `Ja existe um produto com o nome "${nome}" da marca "${marca}".`,
+        existing_product: existing[0]
+      });
+    }
+  } catch (err) {
+    console.error('Erro ao verificar duplicados:', err);
+    return res.status(500).json({ message: 'Erro ao verificar produto existente.' });
+  }
+
+  // Obtem uma ligacao a base de dados para usar transacao
   const connection = await db.promise().getConnection();
   try {
     await connection.beginTransaction();
 
-    // 1. Insere o produto na tabela Products (inclui gender e stock)
+    // Insere o produto na tabela Products
+    // A coluna updated_at e gerida automaticamente pelo MySQL
     const [result] = await connection.query(
-      'INSERT INTO Products (nome, marca, preco, descricao, category_id, tamanhos, gender, stock, data_criacao) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+      'INSERT INTO Products (nome, marca, preco, descricao, category_id, tamanhos, gender, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [nome, marca, preco, descricao || null, category_id, tamanhos || null, gender || 'Unisexo', stock || 0]
     );
     const productId = result.insertId;
 
-    // 2. Insere as imagens (se houver)
+    // Insere as imagens se houver
     if (req.files && req.files.length) {
       for (let idx = 0; idx < req.files.length; idx++) {
         const file = req.files[idx];
         const imageUrl = `/uploads/${file.filename}`;
-        const isPrimary = idx === 0; // A primeira imagem é a principal
+        const isPrimary = idx === 0;
         await connection.query(
           'INSERT INTO ProductsImages (product_id, image_url, is_primary, order_index) VALUES (?, ?, ?, ?)',
           [productId, imageUrl, isPrimary, idx]
         );
       }
-      // 3. Sincroniza o campo 'imagem' do produto com a primeira imagem
+      // Sincroniza o campo 'imagem' do produto com a primeira imagem
       await connection.query(
         `UPDATE Products 
          SET imagem = (
@@ -427,11 +447,9 @@ router.post('/Products', upload.array('images', 6), async (req, res) => {
       );
     }
 
-    // Confirma a transação
     await connection.commit();
     res.status(201).json({ message: 'Produto criado com sucesso!', product_id: productId });
   } catch (err) {
-    // Em caso de erro, desfaz todas as alterações
     await connection.rollback();
     console.error('Erro no POST /admin/Products:', err);
     res.status(500).json({ message: 'Erro ao criar produto.', error: err.message });
@@ -440,7 +458,8 @@ router.post('/Products', upload.array('images', 6), async (req, res) => {
   }
 });
 
-// PUT /admin/Products/:id – Atualizar um produto (com imagens, reordenação, remoção)
+// PUT /admin/Products/:id – Atualizar um produto
+// Permite mesmo nome desde que a marca seja diferente (ignorando o proprio ID)
 router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
   const { id } = req.params;
   console.log('PUT /admin/Products/:id - req.body:', req.body);
@@ -448,19 +467,37 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
 
   const { nome, marca, preco, descricao, category_id, tamanhos, stock, gender } = req.body;
 
-  // Validação dos campos obrigatórios
+  // Validacao dos campos obrigatorios
   if (!nome || !marca || !preco || !category_id) {
     return res.status(400).json({
-      message: 'nome, marca, preco e category_id são obrigatórios.',
+      message: 'nome, marca, preco e category_id sao obrigatorios.',
       received: { nome, marca, preco, category_id }
     });
+  }
+
+  // Validacao: verifica se ja existe produto com mesmo nome E mesma marca (excluindo o proprio)
+  try {
+    const [existing] = await db.promise().query(
+      'SELECT product_id, nome, marca FROM Products WHERE nome = ? AND marca = ? AND product_id != ?',
+      [nome, marca, id]
+    );
+    
+    if (existing.length > 0) {
+      return res.status(400).json({
+        message: `Ja existe um produto com o nome "${nome}" da marca "${marca}".`,
+        existing_product: existing[0]
+      });
+    }
+  } catch (err) {
+    console.error('Erro ao verificar duplicados:', err);
+    return res.status(500).json({ message: 'Erro ao verificar produto existente.' });
   }
 
   const connection = await db.promise().getConnection();
   try {
     await connection.beginTransaction();
 
-    // 1. ATUALIZA OS DADOS DO PRODUTO (incluindo stock e gender)
+    // Atualiza os dados do produto (incluindo stock e gender)
     const stockValue = stock !== undefined && stock !== '' ? parseInt(stock) : 0;
     console.log('A atualizar produto com:', { nome, marca, preco, descricao, category_id, tamanhos, stockValue, gender, id });
     const [updateResult] = await connection.query(
@@ -470,10 +507,10 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
     console.log('Resultado do update:', updateResult);
     if (updateResult.affectedRows === 0) {
       await connection.rollback();
-      return res.status(404).json({ message: 'Produto não encontrado.' });
+      return res.status(404).json({ message: 'Produto nao encontrado.' });
     }
 
-    // 2. ELIMINA IMAGENS MARCADAS
+    // Elimina imagens marcadas para remocao
     let imagesToDelete = req.body.imagesToDelete;
     if (imagesToDelete && typeof imagesToDelete === 'string') {
       try { imagesToDelete = JSON.parse(imagesToDelete); } catch (e) { imagesToDelete = []; }
@@ -486,7 +523,7 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       console.log(`Imagens eliminadas: ${imagesToDelete.join(', ')}`);
     }
 
-    // 3. REORDENA IMAGENS EXISTENTES
+    // Reordena imagens existentes
     let imagesOrder = req.body.imagesOrder;
     if (imagesOrder && typeof imagesOrder === 'string') {
       try { imagesOrder = JSON.parse(imagesOrder); } catch (e) { imagesOrder = []; }
@@ -500,7 +537,7 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       }
       console.log(`Ordem actualizada para o produto ${id}:`, imagesOrder);
     } else {
-      // Se não for enviada ordem, define com base na ordem atual
+      // Se nao for enviada ordem, define com base na ordem atual
       const [remaining] = await connection.query(
         'SELECT image_id FROM ProductsImages WHERE product_id = ? ORDER BY order_index ASC, created_at ASC',
         [id]
@@ -513,7 +550,7 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       }
     }
 
-    // 4. ADICIONA NOVAS IMAGENS
+    // Adiciona novas imagens se houver
     if (req.files && req.files.length) {
       const [maxOrder] = await connection.query(
         'SELECT COALESCE(MAX(order_index), -1) AS maxIdx FROM ProductsImages WHERE product_id = ?',
@@ -536,7 +573,7 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
       console.log(`Novas imagens adicionadas: ${req.files.length}`);
     }
 
-    // 5. ATUALIZA O CAMPO 'imagem' COM A PRIMEIRA IMAGEM DISPONÍVEL
+    // Atualiza o campo 'imagem' com a primeira imagem disponivel
     await connection.query(
       `UPDATE Products 
        SET imagem = (
@@ -559,12 +596,29 @@ router.put('/Products/:id', upload.array('images', 6), async (req, res) => {
   }
 });
 
-// DELETE /admin/Products/:id – Apagar um produto
+// DELETE /admin/Products/:id – Apagar um produto e suas imagens
 router.delete('/Products/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    // Busca imagens para apagar do disco
+    const [images] = await db.promise().query(
+      'SELECT image_url FROM ProductsImages WHERE product_id = ?',
+      [id]
+    );
     const [result] = await db.promise().query('DELETE FROM Products WHERE product_id = ?', [id]);
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Produto não encontrado.' });
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Produto nao encontrado.' });
+    
+    // Apaga os ficheiros de imagem do disco
+    for (const img of images) {
+      if (img.image_url) {
+        const relativePath = img.image_url.replace(/^\/uploads\//, '');
+        const filePath = path.join(__dirname, '../uploads', relativePath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`Imagem apagada: ${filePath}`);
+        }
+      }
+    }
     res.json({ message: 'Produto apagado.' });
   } catch (err) {
     console.error(err);
@@ -573,12 +627,12 @@ router.delete('/Products/:id', async (req, res) => {
 });
 
 // ================================================================
-// ROTAS DE ENCOMENDAS (listagem e atualização de estado)
+// ROTAS DE ENCOMENDAS (listagem e atualizacao de estado)
 // ================================================================
 
-// GET /admin/Orders – Listar encomendas com pesquisa, filtros e ordenação
+// GET /admin/Orders – Listar encomendas com pesquisa, filtros e ordenacao
 router.get('/Orders', async (req, res) => {
-  // Parâmetros da query string
+  // Parametros da query string
   const search = req.query.search ? `%${req.query.search}%` : null;
   const status_id = req.query.status_id ? parseInt(req.query.status_id) : null;
   const sort = req.query.sort || 'order_id_desc';
@@ -617,7 +671,7 @@ router.get('/Orders', async (req, res) => {
     params.push(date_to);
   }
 
-  // Ordenação
+  // Ordenacao
   switch (sort) {
     case 'order_id_asc': sql += ` ORDER BY fo.order_id ASC`; break;
     case 'order_id_desc': sql += ` ORDER BY fo.order_id DESC`; break;
@@ -642,8 +696,8 @@ router.put('/Orders/:order_id/status', async (req, res) => {
   const { order_id } = req.params;
   const { status_id } = req.body;
   
-  // Validação: status_id é obrigatório
-  if (status_id == null) return res.status(400).json({ message: 'status_id é obrigatório.' });
+  // Validacao: status_id e obrigatorio
+  if (status_id == null) return res.status(400).json({ message: 'status_id e obrigatorio.' });
 
   try {
     // Busca dados completos da encomenda (produto e utilizador)
@@ -655,7 +709,7 @@ router.put('/Orders/:order_id/status', async (req, res) => {
        WHERE fo.order_id = ?`,
       [order_id]
     );
-    if (orders.length === 0) return res.status(404).json({ message: 'Encomenda não encontrada.' });
+    if (orders.length === 0) return res.status(404).json({ message: 'Encomenda nao encontrada.' });
     const order = orders[0];
 
     // Atualiza o estado da encomenda
@@ -663,27 +717,27 @@ router.put('/Orders/:order_id/status', async (req, res) => {
       'UPDATE FakeOrders SET status_id = ? WHERE order_id = ?',
       [status_id, order_id]
     );
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Encomenda não encontrada.' });
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Encomenda nao encontrada.' });
 
     const user_id = order.user_id;
     const productNome = order.product_nome;
 
-    // Cria notificações conforme o novo estado
+    // Cria notificacoes conforme o novo estado
+    // status_id = 2: Enviado
+    // status_id = 3: Recebido (envia email de review)
     if (Number(status_id) === 2) {
-      // Estado: Enviado
       const mensagem = `O seu produto '${productNome}' vai chegar em breve.`;
       await db.promise().query(
         'INSERT INTO Notifications (user_id, tipo, conteudo, data_envio) VALUES (?, ?, ?, NOW())',
         [user_id, 'Encomenda', mensagem]
       );
     } else if (Number(status_id) === 3) {
-      // Estado: Recebido
-      const mensagem = `O seu produto '${productNome}' chegou. Espero que goste! Veja o seu email para dar a sua avaliação.`;
+      const mensagem = `O seu produto '${productNome}' chegou. Espero que goste! Veja o seu email para dar a sua avaliacao.`;
       await db.promise().query(
         'INSERT INTO Notifications (user_id, tipo, conteudo, data_envio) VALUES (?, ?, ?, NOW())',
         [user_id, 'Encomenda', mensagem]
       );
-      // Envia email de review (utilizando a função importada)
+      // Envia email de review
       await sendReviewRequestEmail(
         order.email,
         order.primeiro_nome || order.user_nome,
@@ -701,17 +755,17 @@ router.put('/Orders/:order_id/status', async (req, res) => {
 });
 
 // ================================================================
-// ROTAS DE NOTIFICAÇÕES (listagem com filtros)
+// ROTAS DE NOTIFICACOES (listagem com filtros)
 // ================================================================
 
-// GET /admin/Notifications – Listar notificações com pesquisa e filtros
+// GET /admin/Notifications – Listar notificacoes com pesquisa e filtros
 router.get('/Notifications', async (req, res) => {
-  // Parâmetros da query string
+  // Parametros da query string
   const search = req.query.search ? `%${req.query.search}%` : null;
   const type = req.query.type || null;
   const sort = req.query.sort || 'date_desc';
 
-  // Query base com junção à tabela Users para obter o nome do utilizador
+  // Query base com juncao a tabela Users para obter o nome do utilizador
   let sql = `
     SELECT n.*, u.nome AS user_nome, u.email
     FROM Notifications n
@@ -730,7 +784,7 @@ router.get('/Notifications', async (req, res) => {
     params.push(`%${type}%`);
   }
 
-  // Ordenação
+  // Ordenacao
   switch (sort) {
     case 'date_asc': sql += ` ORDER BY n.data_envio ASC`; break;
     case 'type_asc': sql += ` ORDER BY n.tipo ASC`; break;
@@ -738,7 +792,7 @@ router.get('/Notifications', async (req, res) => {
     default: sql += ` ORDER BY n.data_envio DESC`;
   }
   
-  // Limita a 200 notificações para evitar sobrecarga
+  // Limita a 200 notificacoes para evitar sobrecarga
   sql += ` LIMIT 200`;
 
   try {
@@ -746,11 +800,11 @@ router.get('/Notifications', async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Erro ao listar notificações.' });
+    res.status(500).json({ message: 'Erro ao listar notificacoes.' });
   }
 });
 
 // ================================================================
-// EXPORTAÇÃO DO ROUTER
+// EXPORTACAO DO ROUTER
 // ================================================================
 module.exports = router;

@@ -1,11 +1,10 @@
 // ================================================================
-// FAQFLOAT.JSX – Botão flutuante para a página de FAQs
+// FAQFLOAT.JSX – Botao flutuante para a pagina de FAQs
 // ================================================================
-// Este componente exibe um botão circular com ❓ no canto inferior esquerdo.
-// Ao clicar, redireciona o utilizador para a página de Perguntas Frequentes (FAQs).
+// Exibe um botao circular com interrogacao no canto inferior esquerdo.
+// Ao clicar, redireciona o utilizador para a pagina de Perguntas Frequentes.
 // ================================================================
 
-// Importação dos módulos necessários
 import { useNavigate } from 'react-router-dom';
 
 // ================================================================
@@ -13,40 +12,40 @@ import { useNavigate } from 'react-router-dom';
 // ================================================================
 
 export default function FAQFloat() {
-  const navigate = useNavigate();   // Hook para navegação programática
+  const navigate = useNavigate();
 
-  // ----- RENDERIZAÇÃO -----
   return (
-    // Container do botão (posição fixa no canto inferior esquerdo)
+    // Container com posicao fixa no canto inferior esquerdo
+    // Fica acima de todos os outros elementos (zIndex 9999)
     <div
       style={{
-        position: 'fixed',          // Fixo na janela do navegador
-        bottom: '24px',            // Distância do fundo
-        left: '24px',              // Distância da esquerda
-        zIndex: 9999,              // Fica acima de todos os outros elementos
+        position: 'fixed',
+        bottom: '24px',
+        left: '24px',
+        zIndex: 9999,
       }}
     >
-      {/* Botão circular */}
+      {/* Botao circular com efeito de hover */}
       <button
-        onClick={() => navigate('/faq')}   // Redireciona para a página /faq
+        onClick={() => navigate('/faq')}
         style={{
-          width: '56px',                    // Largura do botão
-          height: '56px',                   // Altura do botão
-          borderRadius: '50%',              // Torna o botão circular
-          backgroundColor: '#007bff',       // Cor de fundo azul
-          color: '#fff',                    // Texto branco
-          border: 'none',                   // Remove a borda padrão
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)', // Sombra para profundidade
-          fontSize: '28px',                 // Tamanho do ícone
-          cursor: 'pointer',                // Cursor de mão
-          display: 'flex',                  // Centraliza o ícone
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          backgroundColor: '#007bff',
+          color: '#fff',
+          border: 'none',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          fontSize: '28px',
+          cursor: 'pointer',
+          display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'transform 0.2s',     // Animação suave ao passar o rato
+          transition: 'transform 0.2s',
         }}
-        aria-label="FAQ"                    // Rótulo para acessibilidade
+        aria-label="FAQ"
       >
-        ❓                                   // Ícone de interrogação
+        ❓
       </button>
     </div>
   );

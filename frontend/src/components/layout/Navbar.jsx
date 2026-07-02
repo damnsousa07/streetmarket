@@ -1,29 +1,23 @@
 // ================================================================
-// NAVBAR.JSX – Barra de navegação principal
+// NAVBAR.JSX – Barra de navegacao principal
 // ================================================================
-// Este componente é a barra de navegação principal da aplicação.
-// Inclui:
-// - Logotipo (com link para a página inicial)
-// - Links de navegação (Produtos, Categorias, etc.)
-// - Links condicionais (Notificações, Encomendas, Admin)
-// - Botão de pesquisa
-// - Autenticação (Login/Registar ou Olá, Utilizador + Sair)
-// - Verificação automática de sessão (expiração a cada segundo)
+// Componente da barra de navegacao principal da aplicacao.
+// Inclui logo, links de navegacao, pesquisa e autenticacao.
+// Verifica automaticamente a sessao a cada segundo.
 // ================================================================
 
-// Importação dos módulos necessários
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 
 // ================================================================
-// FUNÇÃO AUXILIAR: Verificar se a sessão do utilizador é válida
+// FUNCAO AUXILIAR: Verificar se a sessao do utilizador e valida
 // ================================================================
 
-// Verifica se o utilizador está autenticado e se a sessão não expirou
+// Verifica se o utilizador esta autenticado e se a sessao nao expirou
 function isSessionValid() {
-    const userId = localStorage.getItem('user_id');                 // ID do utilizador
-    const expiresAt = Number(localStorage.getItem('auth_expires_at') || 0); // Timestamp de expiração
-    return !!userId && Date.now() < expiresAt;                     // Válido se user_id existe e não expirou
+    const userId = localStorage.getItem('user_id');
+    const expiresAt = Number(localStorage.getItem('auth_expires_at') || 0);
+    return !!userId && Date.now() < expiresAt;
 }
 
 // ================================================================
@@ -31,15 +25,15 @@ function isSessionValid() {
 // ================================================================
 
 export default function Navbar() {
-    const navigate = useNavigate();                                 // Hook para navegação programática
+    const navigate = useNavigate();
 
     // Estados para controlar o login e dados do utilizador
-    const [loggedIn, setLoggedIn] = useState(isSessionValid());     // Se o utilizador está logado
-    const userNome = useMemo(() => localStorage.getItem('user_nome') || '', [loggedIn]); // Nome do utilizador
-    const userTipo = useMemo(() => localStorage.getItem('user_tipo') || '', [loggedIn]); // Tipo (Administrador/Utilizador)
+    const [loggedIn, setLoggedIn] = useState(isSessionValid());
+    const userNome = useMemo(() => localStorage.getItem('user_nome') || '', [loggedIn]);
+    const userTipo = useMemo(() => localStorage.getItem('user_tipo') || '', [loggedIn]);
 
     // ================================================================
-    // FUNÇÃO: Logout
+    // FUNCAO: Logout
     // ================================================================
 
     // Remove todos os dados do utilizador do localStorage e redireciona para login
@@ -50,39 +44,38 @@ export default function Navbar() {
         localStorage.removeItem('user_tipo');
         localStorage.removeItem('auth_expires_at');
 
-        setLoggedIn(false);                                         // Atualiza o estado
-        navigate('/login');                                         // Redireciona para a página de login
+        setLoggedIn(false);
+        navigate('/login');
     }
 
     // ================================================================
-    // EFFECT: Verificar sessão a cada segundo
+    // EFFECT: Verificar sessao a cada segundo
     // ================================================================
 
-    // Verifica periodicamente se a sessão ainda é válida.
+    // Verifica periodicamente se a sessao ainda e valida.
     // Se expirar, faz logout automaticamente.
     useEffect(() => {
         const tick = () => {
             const ok = isSessionValid();
-            if (!ok && loggedIn) logout();                          // Se expirou, faz logout
-            else setLoggedIn(ok);                                   // Caso contrário, mantém o estado
+            if (!ok && loggedIn) logout();
+            else setLoggedIn(ok);
         };
 
-        tick();                                                     // Verifica imediatamente
-        const interval = setInterval(tick, 1000);                   // Verifica a cada 1 segundo
-        return () => clearInterval(interval);                       // Limpa o intervalo ao desmontar
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        tick();
+        const interval = setInterval(tick, 1000);
+        return () => clearInterval(interval);
     }, [loggedIn]);
 
     // ================================================================
-    // FUNÇÃO: Abrir página de pesquisa
+    // FUNCAO: Abrir pagina de pesquisa
     // ================================================================
 
     const handleOpenSearch = () => {
-        navigate('/search');                                        // Navega para a página de pesquisa
+        navigate('/search');
     };
 
     // ================================================================
-    // RENDERIZAÇÃO
+    // RENDERIZACAO
     // ================================================================
 
     return (
@@ -97,10 +90,10 @@ export default function Navbar() {
                 flexWrap: 'nowrap',
                 width: '100%',
             }}>
-                {/* ----- LOGOTIPO ----- */}
+                {/* Logo da marca com link para a pagina inicial */}
                 <Link
                     to="/"
-                    aria-label="Ir para a página inicial"
+                    aria-label="Ir para a pagina inicial"
                     style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -120,7 +113,7 @@ export default function Navbar() {
                     />
                 </Link>
 
-                {/* ----- LINKS DE NAVEGAÇÃO CENTRAIS ----- */}
+                {/* Links de navegacao centrais */}
                 <nav className="navbar-links" style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
@@ -130,21 +123,19 @@ export default function Navbar() {
                     justifyContent: 'center',
                     minWidth: 0,
                 }}>
-                    {/* Link para a página inicial */}
                     <NavLink to="/" end className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                         Produtos
                     </NavLink>
 
-                    {/* Link para a página de categorias */}
                     <NavLink to="/categories" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                         Categorias
                     </NavLink>
 
-                    {/* Links visíveis apenas se o utilizador estiver logado */}
+                    {/* Links visiveis apenas se o utilizador estiver logado */}
                     {loggedIn && (
                         <>
                             <NavLink to="/notifications" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
-                                Notificações
+                                Notificacoes
                             </NavLink>
                             <NavLink to="/orders" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                                 Encomendas
@@ -152,20 +143,19 @@ export default function Navbar() {
                         </>
                     )}
 
-                    {/* Link Admin – visível apenas para Administradores */}
+                    {/* Link Admin – visivel apenas para Administradores */}
                     {loggedIn && userTipo === 'Administrador' && (
                         <NavLink to="/admin" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                             Admin
                         </NavLink>
                     )}
 
-                    {/* Botão para abrir a página de pesquisa */}
                     <button onClick={handleOpenSearch} className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                         Pesquisar / Filtrar
                     </button>
                 </nav>
 
-                {/* ----- GRUPO DA DIREITA (Autenticação) ----- */}
+                {/* Grupo da direita com autenticacao */}
                 <div style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
@@ -175,17 +165,17 @@ export default function Navbar() {
                     marginRight: '8px',
                 }}>
                     {loggedIn ? (
-                        // Utilizador logado: mostra nome e botão Sair
+                        // Utilizador logado: mostra nome e botao Sair
                         <>
                             <span className="navbar-user" style={{ whiteSpace: 'nowrap', fontSize: '16px' }}>
-                                Olá, {userNome || 'Utilizador'}
+                                Ola, {userNome || 'Utilizador'}
                             </span>
                             <button className="btn btn-ghost" onClick={logout} style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                                 Sair
                             </button>
                         </>
                     ) : (
-                        // Utilizador não logado: mostra Login e Registar
+                        // Utilizador nao logado: mostra Login e Registar
                         <>
                             <NavLink to="/login" className="btn btn-ghost" style={{ whiteSpace: 'nowrap', fontSize: '16px', height: '40px', padding: '0 14px' }}>
                                 Login

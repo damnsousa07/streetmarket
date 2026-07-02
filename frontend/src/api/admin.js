@@ -1,15 +1,13 @@
 // ================================================================
-// ADMIN.JS – Serviço de API para o painel de administração
+// ADMIN.JS – Servico de API para o painel de administracao
 // ================================================================
-// Este ficheiro contém todas as funções para comunicar com as rotas
-// administrativas do backend (produtos, categorias, encomendas, notificações).
-// Todas as funções incluem a chave de administrador (x-admin-key) no header.
+// Contem todas as funcoes para comunicar com as rotas administrativas do backend.
+// Todas as funcoes incluem a chave de administrador (x-admin-key) no header.
 // ================================================================
 
-// Importação do cliente HTTP (Axios) configurado
 import { api } from './client';
 
-// ----- FUNÇÃO AUXILIAR: Obtém a chave de administrador do localStorage -----
+// Funcao auxiliar: obtem a chave de administrador do localStorage
 function getAdminKey() {
   return localStorage.getItem('admin_key') || '';
 }
@@ -18,7 +16,7 @@ function getAdminKey() {
 // ADMIN ORDERS (Encomendas)
 // ================================================================
 
-// GET /admin/Orders – Lista todas as encomendas (com filtros opcionais)
+// GET /admin/Orders – Lista todas as encomendas com filtros opcionais
 export async function getAdminOrders(queryString = '') {
   const key = getAdminKey();
   const res = await api.get(`/admin/Orders${queryString ? `?${queryString}` : ''}`, {
@@ -42,7 +40,7 @@ export async function updateAdminOrderStatus(order_id, status_id) {
 // ADMIN PRODUCTS (Produtos)
 // ================================================================
 
-// GET /admin/Products – Lista todos os produtos (com paginação e filtros)
+// GET /admin/Products – Lista todos os produtos com paginacao e filtros
 export async function getAdminProducts(queryString = '') {
   const key = getAdminKey();
   const res = await api.get(`/admin/Products${queryString ? `?${queryString}` : ''}`, {
@@ -51,7 +49,7 @@ export async function getAdminProducts(queryString = '') {
   return res.data;
 }
 
-// POST /admin/Products – Cria um novo produto (com FormData para imagens)
+// POST /admin/Products – Cria um novo produto com FormData para imagens
 export async function createAdminProduct(formData) {
   const key = getAdminKey();
   const res = await api.post('/admin/Products', formData, {
@@ -60,7 +58,7 @@ export async function createAdminProduct(formData) {
   return res.data;
 }
 
-// PUT /admin/Products/:id – Atualiza um produto existente (com FormData)
+// PUT /admin/Products/:id – Atualiza um produto existente com FormData
 export async function updateAdminProduct(id, formData) {
   const key = getAdminKey();
   const res = await api.put(`/admin/Products/${id}`, formData, {
@@ -78,7 +76,7 @@ export async function deleteAdminProduct(id) {
   return res.data;
 }
 
-// GET /admin/Products/:id – Obtém os detalhes de um produto específico
+// GET /admin/Products/:id – Obtem os detalhes de um produto especifico
 export async function getAdminProductById(id) {
   const key = getAdminKey();
   const res = await api.get(`/admin/Products/${id}`, {
@@ -91,7 +89,7 @@ export async function getAdminProductById(id) {
 // ADMIN CATEGORIES (Categorias)
 // ================================================================
 
-// GET /admin/Categories – Lista todas as categorias (com pesquisa e ordenação)
+// GET /admin/Categories – Lista todas as categorias com pesquisa e ordenacao
 export async function getAdminCategories(queryString = '') {
   const key = getAdminKey();
   const res = await api.get(`/admin/Categories${queryString ? `?${queryString}` : ''}`, {
@@ -100,34 +98,33 @@ export async function getAdminCategories(queryString = '') {
   return res.data;
 }
 
-// POST /admin/Categories – Cria uma nova categoria (com imagem em FormData)
+// POST /admin/Categories – Cria uma nova categoria com imagem em FormData
 export async function createAdminCategory(formData) {
   const key = getAdminKey();
   const res = await api.post('/admin/Categories', formData, {
     headers: { 'x-admin-key': key },
-    // NOTA: O browser define o content-type automaticamente, com o boundary
   });
   return res.data;
 }
 
-// PUT /admin/Categories/:id – Atualiza uma categoria existente (com imagem em FormData)
+// PUT /admin/Categories/:id – Atualiza uma categoria existente com imagem em FormData
 export async function updateAdminCategory(id, formData) {
   const key = getAdminKey();
   
-  // Logs para depuração (mostram o que está a ser enviado)
-  console.log('🔵 updateAdminCategory chamado com ID:', id);
+  // Logs para depuracao
+  console.log('updateAdminCategory chamado com ID:', id);
   for (let [key, value] of formData.entries()) {
     if (key === 'image' && value instanceof File) {
-      console.log(`🔵 FormData: ${key} = File: ${value.name} (${value.size} bytes)`);
+      console.log(`FormData: ${key} = File: ${value.name} (${value.size} bytes)`);
     } else {
-      console.log(`🔵 FormData: ${key} = ${value}`);
+      console.log(`FormData: ${key} = ${value}`);
     }
   }
   
   const res = await api.put(`/admin/Categories/${id}`, formData, {
     headers: { 'x-admin-key': key },
   });
-  console.log('🔵 Resposta do update:', res.data);
+  console.log('Resposta do update:', res.data);
   return res.data;
 }
 
@@ -141,10 +138,10 @@ export async function deleteAdminCategory(id) {
 }
 
 // ================================================================
-// ADMIN NOTIFICATIONS (Notificações)
+// ADMIN NOTIFICATIONS (Notificacoes)
 // ================================================================
 
-// GET /admin/Notifications – Lista notificações (com pesquisa e filtros)
+// GET /admin/Notifications – Lista notificacoes com pesquisa e filtros
 export async function getAdminNotifications(queryString = '') {
   const key = getAdminKey();
   const res = await api.get(`/admin/Notifications${queryString ? `?${queryString}` : ''}`, {
@@ -156,8 +153,8 @@ export async function getAdminNotifications(queryString = '') {
 // ================================================================
 // NOTAS GERAIS:
 // ================================================================
-// Todas as funções incluem o header 'x-admin-key' para autenticação.
-// As funções que recebem FormData (create/update) não têm Content-Type definido
-//    para que o browser defina automaticamente com o boundary correto.
-// As funções de listagem aceitam queryString para filtros, paginação e ordenação.
+// Todas as funcoes incluem o header 'x-admin-key' para autenticacao.
+// Funcoes com FormData (create/update) nao tem Content-Type definido
+// para que o browser defina automaticamente com o boundary correto.
+// Funcoes de listagem aceitam queryString para filtros, paginacao e ordenacao.
 // ================================================================

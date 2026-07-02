@@ -261,15 +261,18 @@ const ProductForm = memo(({
             min="0"
           />
         </div>
-        {/* Tamanhos */}
+        {/* Tamanhos (obrigatório) */}
         <div style={{ gridColumn: '1 / -1' }}>
-          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>Tamanhos (separados por vírgula)</label>
+          <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
+            Tamanhos (separados por vírgula) *
+          </label>
           <input
             className="input"
             name="tamanhos"
             ref={tamanhosRef}
             defaultValue={editingProduct?.tamanhos || ''}
             placeholder="Ex: XS,S,M,L,XL"
+            required
           />
         </div>
 
@@ -346,12 +349,18 @@ const ProductForm = memo(({
           </div>
         )}
 
-        {/* Upload de novas imagens */}
+        {/* Upload de novas imagens (obrigatório) */}
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={{ display: 'block', color: 'var(--muted)', fontSize: 13, marginBottom: 6 }}>
-            {editingProduct ? 'Adicionar novas imagens (opcional, até 6)' : 'Imagens (até 6)'}
+            {editingProduct ? 'Adicionar novas imagens (ou mantenha as existentes) *' : 'Imagens (até 6) *'}
           </label>
-          <input type="file" multiple accept="image/*" onChange={handleImageChange} className="input" />
+          <input 
+            type="file" 
+            multiple 
+            accept="image/*" 
+            onChange={handleImageChange} 
+            className="input" 
+          />
           {previewUrls.length > 0 && (
             <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               {previewUrls.map((url, idx) => (
@@ -677,6 +686,9 @@ export default function AdminProducts({ embedded = false }) {
 
   const closeDeleteErrorModal = () => setShowDeleteErrorModal(false);
 
+  // Função para fechar o modal de sucesso
+  const closeSuccessModal = () => setShowSuccessModal(false);
+
   // ================================================================
   // FUNÇÃO: Submeter formulário (criação ou edição)
   // ================================================================
@@ -706,6 +718,27 @@ export default function AdminProducts({ embedded = false }) {
       return;
     }
 
+    // Validação: tamanhos obrigatório (criação e edição)
+    if (!tamanhosValue) {
+      setError('Tamanhos são obrigatórios. Ex: XS,S,M,L,XL');
+      return;
+    }
+
+    // Validação: pelo menos uma imagem (criação e edição)
+    if (editingProduct) {
+      // Na edição: verifica se há imagens existentes OU novas imagens
+      if (existingImages.length === 0 && imageFiles.length === 0) {
+        setError('Pelo menos uma imagem é obrigatória.');
+        return;
+      }
+    } else {
+      // Na criação: verifica se há novas imagens
+      if (imageFiles.length === 0) {
+        setError('Pelo menos uma imagem é obrigatória.');
+        return;
+      }
+    }
+
     // Prepara o FormData (para upload de imagens)
     const formData = new FormData();
     formData.append('nome', nomeValue);
@@ -716,6 +749,8 @@ export default function AdminProducts({ embedded = false }) {
     formData.append('tamanhos', tamanhosValue || '');
     formData.append('gender', genderValue);
     formData.append('stock', stockValue);
+    // NOTA: O campo 'updated_at' é gerido automaticamente pelo MySQL (DEFAULT CURRENT_TIMESTAMP)
+    // Não é necessário enviar data_criacao nem updated_at no FormData
     imageFiles.forEach(file => formData.append('images', file));
 
     try {

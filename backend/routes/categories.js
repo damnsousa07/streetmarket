@@ -1,39 +1,53 @@
 // ================================================================
-// CATEGORIES.JS – Rotas públicas de categorias
+// CATEGORIES.JS – Rotas publicas de categorias
 // ================================================================
-// Este ficheiro contém as rotas para listar categorias na página pública.
-// Estas rotas NÃO requerem autenticação.
-// ================================================================
-
-// Importação dos módulos necessários
-const express = require('express');        // Framework para construir a API
-const router = express.Router();           // Cria um router para definir as rotas
-const db = require('../db');               // Ligação à base de dados MySQL
-
-// ================================================================
-// ROTA PÚBLICA: Listar todas as categorias (com imagem_url)
+// Contem as rotas para listar categorias na parte publica da aplicacao.
 // ================================================================
 
-// GET /categories – Retorna todas as categorias ordenadas por nome (A→Z)
-// Esta rota é utilizada na página pública de categorias (/categories)
-// para exibir a lista de categorias com as suas imagens.
+const express = require('express');
+const router = express.Router();
+const db = require('../db');
+
+// ================================================================
+// ROTA: Listar todas as categorias
+// ================================================================
+
+// GET /categories – Retorna a lista de todas as categorias
 router.get('/', async (req, res) => {
-  try {
-    // Query: seleciona todas as categorias (inclui o campo image_url)
-    // Ordena por nome em ordem alfabética (A→Z) para facilitar a navegação
-    const [rows] = await db.promise().query('SELECT * FROM Categories ORDER BY nome ASC');
-    
-    // Retorna os dados em JSON para o frontend consumir
-    res.json(rows);
-  } catch (err) {
-    // Em caso de erro, regista no console e devolve erro 500
-    console.error(err);
-    res.status(500).json({ message: 'Erro ao listar categorias.' });
-  }
+    try {
+        // Busca todas as categorias ordenadas por nome de A a Z
+        // A ordenacao e importante para consistencia visual na pagina publica
+        const [rows] = await db.promise().query(
+            'SELECT * FROM Categories ORDER BY nome ASC'
+        );
+        res.json(rows);
+    } catch (err) {
+        console.error('Erro ao listar categorias:', err);
+        res.status(500).json({ message: 'Erro ao listar categorias.' });
+    }
 });
 
 // ================================================================
-// EXPORTAÇÃO DO ROUTER
+// ROTA: Obter uma categoria especifica
 // ================================================================
-// Exporta o router para ser utilizado no index.js
+
+// GET /categories/:id – Retorna os detalhes de uma categoria pelo ID
+// Utilizada para ver detalhes ou produtos de uma categoria especifica
+router.get('/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [rows] = await db.promise().query(
+            'SELECT * FROM Categories WHERE category_id = ?',
+            [id]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Categoria nao encontrada.' });
+        }
+        res.json(rows[0]);
+    } catch (err) {
+        console.error('Erro ao obter categoria:', err);
+        res.status(500).json({ message: 'Erro ao obter categoria.' });
+    }
+});
+
 module.exports = router;

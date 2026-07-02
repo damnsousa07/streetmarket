@@ -10,6 +10,7 @@
 // - Género (gender)
 // - Faixa de preço (min_price, max_price)
 // - Ordenação (sort)
+// - Stock (in_stock) - filtrar apenas produtos com stock > 0
 // Inclui paginação (12 produtos por página).
 // ================================================================
 
@@ -60,6 +61,7 @@ export default function Search() {
     const min_price = searchParams.get('min_price') || '';
     const max_price = searchParams.get('max_price') || '';
     const sort = searchParams.get('sort') || 'price_asc';
+    const in_stock = searchParams.get('in_stock') || '';
 
     // ================================================================
     // FUNÇÃO: Buscar produtos com paginação e filtros
@@ -71,9 +73,22 @@ export default function Search() {
 
         try {
             // Constrói os filtros com os parâmetros da URL
-            const filters = { q, category_id, brand, gender, min_price, max_price, sort, page, limit };
+            const filters = { 
+                q, 
+                category_id, 
+                brand, 
+                gender, 
+                min_price, 
+                max_price, 
+                sort, 
+                page, 
+                limit,
+                in_stock: in_stock === 'true' ? true : false
+            };
+            console.log('🔍 FILTROS A ENVIAR:', filters);
+            
             const response = await searchProducts(filters);
-            console.log('📦 Resposta do Search:', response);
+            console.log('📦 RESPOSTA DO SEARCH:', response);
             // Atualiza os estados com os dados recebidos
             setProducts(response.data || []);
             setCurrentPage(response.meta?.currentPage || 1);
@@ -96,7 +111,7 @@ export default function Search() {
         setCurrentPage(1);
         fetchProducts(1);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [q, category_id, brand, gender, min_price, max_price, sort]);
+    }, [q, category_id, brand, gender, min_price, max_price, sort, in_stock]);
 
     // ================================================================
     // EFFECT: Carregar categorias e marcas (dropdowns)
@@ -141,7 +156,16 @@ export default function Search() {
 
     // Limpa todos os filtros (volta ao estado inicial)
     const clearFilters = () => {
-        setSearchParams({ q: '', category_id: '', brand: '', gender: '', min_price: '', max_price: '', sort: 'price_asc' });
+        setSearchParams({ 
+            q: '', 
+            category_id: '', 
+            brand: '', 
+            gender: '', 
+            min_price: '', 
+            max_price: '', 
+            sort: 'price_asc',
+            in_stock: ''
+        });
     };
 
     // Muda para a página especificada (se válida)
@@ -274,6 +298,20 @@ export default function Search() {
                         />
                     </div>
 
+                    {/* Filtro: Apenas produtos em stock */}
+                    <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', marginBottom: 6 }}>Stock</label>
+                        <select
+                            name="in_stock"
+                            value={in_stock}
+                            onChange={handleFilterChange}
+                            className="input"
+                        >
+                            <option value="">Todos</option>
+                            <option value="true">Apenas em stock</option>
+                        </select>
+                    </div>
+
                     {/* Ordenação */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ display: 'block', marginBottom: 6 }}>Ordenar por</label>
@@ -343,6 +381,12 @@ export default function Search() {
                                     <div style={{ fontWeight: 700 }}>{p.nome}</div>
                                     <div style={{ color: 'var(--muted)', fontSize: 13 }}>{p.marca}</div>
                                     <div style={{ marginTop: 8, fontWeight: 800 }}>€{p.preco}</div>
+                                    {/* Indicador de stock */}
+                                    {p.stock > 0 ? (
+                                        <span style={{ fontSize: 12, color: 'green' }}>✅ Em stock</span>
+                                    ) : (
+                                        <span style={{ fontSize: 12, color: 'red' }}>❌ Sem stock</span>
+                                    )}
                                 </div>
                             </Link>
                         ))}
